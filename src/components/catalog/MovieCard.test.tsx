@@ -52,25 +52,9 @@ describe('MovieCard', () => {
     expect(screen.getByText(mockMovie.genre, { exact: false })).toBeInTheDocument(); // case-insensitive and partial match due to capitalize
     expect(screen.getByRole('button', { name: `Play ${mockMovie.title}` })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /more information/i })).not.toBeInTheDocument(); // More Info button removed
-    expect(screen.getByRole('button', { name: /add to watchlist/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add to watchlist/i })).not.toBeInTheDocument();
   });
 
-
-  it('calls toast on "Add to Watchlist" button click', async () => {
-    const user = userEvent.setup();
-    render(<MovieCard movie={mockMovie} />);
-    
-    // The button is part of the overlay, so it's always in the DOM.
-    const addToWatchlistButton = screen.getByRole('button', { name: /add to watchlist/i });
-    await user.click(addToWatchlistButton);
-
-    await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith({
-        title: "Watchlist Updated",
-        description: `${mockMovie.title} has been added to your watchlist.`,
-      });
-    });
-  });
 
   it('Play button is part of the link and navigates', () => {
     render(<MovieCard movie={mockMovie} />);

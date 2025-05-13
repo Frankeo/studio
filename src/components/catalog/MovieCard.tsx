@@ -3,26 +3,15 @@ import type { Movie } from '@/types/movie';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
-import { Play, PlusCircle } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+
 
 interface MovieCardProps {
   movie: Movie;
 }
 
 export default function MovieCard({ movie }: MovieCardProps) {
-  const { toast } = useToast();
-
-  const handleAddToWatchlist = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent link navigation
-    // In a real app, you would call an API or update context/state here
-    console.log(`Adding ${movie.title} to watchlist...`);
-    toast({
-      title: "Watchlist Updated",
-      description: `${movie.title} has been added to your watchlist.`,
-    });
-  };
 
   return (
     <Link href={`/player/${movie.id}`} passHref legacyBehavior>
@@ -39,21 +28,9 @@ export default function MovieCard({ movie }: MovieCardProps) {
           />
 
           {/* Overlay Content: Initially hidden, appears on hover */}
-          <div className="absolute inset-0 flex flex-col justify-between p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            {/* Top section of overlay: Add to Watchlist icon */}
-            <div className="self-end opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-100">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/20 hover:text-white h-8 w-8 rounded-full"
-                onClick={handleAddToWatchlist}
-                aria-label="Add to watchlist"
-                title="Add to watchlist"
-              >
-                <PlusCircle className="h-5 w-5" />
-              </Button>
-            </div>
-
+          <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            {/* Top section of overlay: Removed Add to Watchlist icon */}
+            
             {/* Bottom section of overlay: Title, Genre, Play button */}
             <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 ease-out delay-50">
               <h3 className="text-sm sm:text-base font-bold text-white mb-1 line-clamp-2 shadow-text">

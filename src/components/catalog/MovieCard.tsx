@@ -2,7 +2,8 @@ import type { Movie } from '@/types/movie';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Star, CalendarDays, Clock } from 'lucide-react';
+import { Play, Info } from 'lucide-react'; // Import Play and Info icons
+import { Button } from '@/components/ui/button';
 
 interface MovieCardProps {
   movie: Movie;
@@ -11,9 +12,9 @@ interface MovieCardProps {
 export default function MovieCard({ movie }: MovieCardProps) {
   return (
     <Link href={`/player/${movie.id}`} passHref legacyBehavior>
-      <a className="block group" aria-label={`Play ${movie.title}`}>
-        <Card className="overflow-hidden h-full flex flex-col bg-card hover:shadow-2xl hover:border-primary transition-all duration-300 ease-in-out transform hover:-translate-y-1">
-          <CardHeader className="p-0 relative aspect-[2/3]">
+      <a className="block group" aria-label={`View details for ${movie.title}`}>
+        <Card className="overflow-hidden h-full flex flex-col bg-card hover:shadow-2xl hover:border-primary/50 transition-all duration-300 ease-in-out transform hover:-translate-y-1">
+          <CardHeader className="p-0 relative aspect-[2/3] w-full">
             <Image
               src={movie.posterUrl || "https://picsum.photos/300/450?grayscale"}
               alt={`Poster for ${movie.title}`}
@@ -22,28 +23,25 @@ export default function MovieCard({ movie }: MovieCardProps) {
               className="transition-transform duration-300 group-hover:scale-105"
               data-ai-hint="movie poster"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            {/* Play Icon Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/50 transition-all duration-300 opacity-0 group-hover:opacity-100 rounded-t-lg">
+              <Play className="h-14 w-14 md:h-16 md:w-16 text-white opacity-0 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300 ease-in-out" fill="white" />
+            </div>
           </CardHeader>
-          <CardContent className="p-4 flex-grow">
-            <CardTitle className="text-lg font-semibold leading-tight group-hover:text-primary transition-colors duration-300">
+          <CardContent className="p-3 flex-grow space-y-1">
+            <CardTitle className="text-base font-semibold leading-tight group-hover:text-primary transition-colors duration-300 line-clamp-1">
               {movie.title}
             </CardTitle>
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{movie.description}</p>
+            <p className="text-xs text-muted-foreground line-clamp-1 capitalize">
+              {movie.genre || 'Uncategorized'}
+            </p>
           </CardContent>
-          <CardFooter className="p-4 pt-0 text-xs text-muted-foreground flex flex-col space-y-1 items-start">
-            <div className="flex items-center space-x-2">
-              <Star className="w-3 h-3 text-yellow-400" />
-              <span>{movie.rating ? movie.rating.toFixed(1) : 'N/A'}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <CalendarDays className="w-3 h-3" />
-              <span>{movie.year || 'N/A'}</span>
-            </div>
-             <div className="flex items-center space-x-2">
-              <Clock className="w-3 h-3" />
-              <span>{movie.duration || 'N/A'}</span>
-            </div>
-            <p className="text-xs capitalize">{movie.genre || 'Uncategorized'}</p>
+          <CardFooter className="p-3 pt-0">
+            {/* This button is part of the larger link, so it also navigates to the player page */}
+            <Button variant="outline" size="sm" className="w-full text-xs" tabIndex={-1} aria-hidden="true">
+              <Info className="mr-2 h-3.5 w-3.5" />
+              More Info
+            </Button>
           </CardFooter>
         </Card>
       </a>

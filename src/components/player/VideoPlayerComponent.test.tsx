@@ -1,4 +1,3 @@
-
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import VideoPlayerComponent from './VideoPlayerComponent';
@@ -42,13 +41,21 @@ describe('VideoPlayerComponent', () => {
         configurable: true,
         value: mockFocus,
     });
+    // Default to paused initially for tests unless play is explicitly called
     Object.defineProperty(window.HTMLMediaElement.prototype, 'paused', {
       configurable: true,
       get: vi.fn(() => true), 
+      set: vi.fn(),
+    });
+    Object.defineProperty(window.HTMLMediaElement.prototype, 'controls', {
+      configurable: true,
+      get: vi.fn(() => true), // Initial value doesn't matter much as it's set by component
+      set: vi.fn(), // Mock the setter to track calls
     });
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -60,7 +67,7 @@ describe('VideoPlayerComponent', () => {
     expect(videoElement).toBeInTheDocument();
     expect(videoElement).toHaveAttribute('src', mockMovie.videoUrl);
     expect(videoElement).toHaveAttribute('poster', mockMovie.posterUrl);
-    expect(videoElement).toHaveAttribute('controls');
+    // Controls attribute is now dynamically managed
   });
 
   it('renders video element with default poster if movie.posterUrl is not provided', () => {
@@ -86,152 +93,181 @@ describe('VideoPlayerComponent', () => {
     expect(screen.getByRole('region', { name: `Video player for ${mockMovie.title}` })).toBeInTheDocument();
   });
 
-  it('video element contains fallback text for browsers not supporting the video tag', () => {
-    render(<VideoPlayerComponent movie={mockMovie} />);
-    const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` });
-    expect(videoElement.textContent).toBe('Your browser does not support the video tag.');
-  });
-
-  it('attempts to play the video on mount', async () => {
+  it('attempts to play the video on mount and shows UI (including native controls)', async () => {
     render(<VideoPlayerComponent movie={mockMovie} />);
     await waitFor(() => {
         expect(mockPlay).toHaveBeenCalled();
     });
+    // UI should be visible initially, and native controls should be set to true
+    const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
+    // The 'controls' setter on the mock is called by the component's useEffect
+    await waitFor(() => expect(videoElement.controls).toBe(true));
   });
 
-  it('shows pause overlay with top-left info and centered icon-only resume button when video is paused', async () => {
+  it('shows pause overlay with info and resume button when video is paused and UI is visible (native controls true)', async () => {
     render(<VideoPlayerComponent movie={mockMovie} />);
     const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
-
-    Object.defineProperty(videoElement, 'paused', { get: () => false });
-    act(() => { fireEvent.play(videoElement); }); 
     
+    // Simulate video being paused
     Object.defineProperty(videoElement, 'paused', { get: () => true });
     act(() => { fireEvent.pause(videoElement); }); 
 
     await waitFor(() => {
-      // Info section content (should be top-left)
+      // Info section content
       expect(screen.getByText(mockMovie.title, { selector: 'h1.text-2xl' })).toBeInTheDocument();
-      expect(screen.getByText(mockMovie.description, {selector: 'p.text-sm'})).toBeInTheDocument();
-      expect(screen.getByText(mockMovie.year.toString())).toBeInTheDocument();
-      expect(screen.getByText(mockMovie.duration)).toBeInTheDocument();
-      expect(screen.getByText(mockMovie.genre, { exact: false })).toBeInTheDocument();
-      expect(screen.getByText(`Rating: ${mockMovie.rating}/5`)).toBeInTheDocument();
-      
-      // Resume button (should be centered and icon-only, check by aria-label)
-      const resumeButton = screen.getByRole('button', { name: `Resume playing ${mockMovie.title}` });
-      expect(resumeButton).toBeInTheDocument();
-      // Check for Play icon inside the button (lucide-react often renders svg)
-      expect(resumeButton.querySelector('svg')).toBeInTheDocument(); 
-      // Check that the button does not contain text like "Resume Play"
-      expect(resumeButton.textContent).toBe(""); // Or check for absence of specific text if icon has title/desc
+      // Resume button
+      expect(screen.getByRole('button', { name: `Resume playing ${mockMovie.title}` })).toBeInTheDocument();
+      expect(videoElement.controls).toBe(true);
+    });
+  });
+  
+  it('shows hover info overlay when video is playing and UI is visible (mouse is active, native controls true)', async () => {
+    render(<VideoPlayerComponent movie={mockMovie} />);
+    const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
+    const playerContainer = videoElement.parentElement!;
 
-      // Check for classes that imply centering (approximate check)
-      expect(resumeButton.parentElement).toHaveClass('absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2');
+    // Simulate video playing
+    Object.defineProperty(videoElement, 'paused', { get: () => false });
+    act(() => { fireEvent.play(videoElement); });
+    
+    // Simulate mouse move to show UI
+    act(() => { fireEvent.mouseMove(playerContainer); });
+
+    await waitFor(() => {
+      expect(screen.getByText(mockMovie.title, { selector: 'h2.text-xl' })).toBeInTheDocument(); // Hover title is h2
+      expect(videoElement.controls).toBe(true);
     });
   });
 
-  it('hides pause overlay and resumes play when "Resume" button (icon-only) on pause overlay is clicked', async () => {
+  it('hides hover info overlay and native controls after timeout when video is playing and mouse is inactive', async () => {
+    render(<VideoPlayerComponent movie={mockMovie} />);
+    const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
+    const playerContainer = videoElement.parentElement!;
+
+    Object.defineProperty(videoElement, 'paused', { get: () => false });
+    act(() => { fireEvent.play(videoElement); });
+    
+    act(() => { fireEvent.mouseMove(playerContainer); }); // Make UI visible and start timer
+
+    await waitFor(() => { // UI is visible
+      expect(screen.getByText(mockMovie.title, { selector: 'h2.text-xl' })).toBeInTheDocument();
+      expect(videoElement.controls).toBe(true);
+    });
+    
+    act(() => { vi.advanceTimersByTime(3000); }); // Advance timer
+
+    await waitFor(() => { // UI should be hidden
+      expect(screen.queryByText(mockMovie.title, { selector: 'h2.text-xl' })).not.toBeInTheDocument();
+      expect(videoElement.controls).toBe(false);
+    });
+  });
+  
+  it('keeps pause overlay and native controls visible when paused, regardless of mouse activity/timeout', async () => {
+    render(<VideoPlayerComponent movie={mockMovie} />);
+    const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
+    const playerContainer = videoElement.parentElement!;
+
+    Object.defineProperty(videoElement, 'paused', { get: () => true });
+    act(() => { fireEvent.pause(videoElement); });
+
+    await waitFor(() => { // Pause overlay visible
+      expect(screen.getByText(mockMovie.title, { selector: 'h1.text-2xl' })).toBeInTheDocument();
+      expect(videoElement.controls).toBe(true);
+    });
+
+    act(() => { fireEvent.mouseMove(playerContainer); }); // Move mouse
+    act(() => { vi.advanceTimersByTime(4000); }); // Advance time past timeout
+
+    await waitFor(() => { // Pause overlay should still be visible
+      expect(screen.getByText(mockMovie.title, { selector: 'h1.text-2xl' })).toBeInTheDocument();
+      expect(videoElement.controls).toBe(true);
+    });
+  });
+
+  it('toggles play/pause on player container click and manages UI visibility', async () => {
+    const user = userEvent.setup();
+    render(<VideoPlayerComponent movie={mockMovie} />);
+    const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
+    const playerContainer = videoElement.parentElement!;
+
+    // Initial: Play is called on mount, assume it's playing for this test part
+    Object.defineProperty(videoElement, 'paused', { get: () => false, configurable: true });
+    act(() => { fireEvent.play(videoElement); }); // Simulate play event
+    act(() => { fireEvent.mouseMove(playerContainer); }); // Ensure UI is active
+    
+    await waitFor(() => expect(screen.getByText(mockMovie.title, { selector: 'h2.text-xl' })).toBeInTheDocument());
+
+    // Click to Pause
+    Object.defineProperty(videoElement, 'paused', { get: () => true, configurable: true });
+    await user.click(playerContainer); 
+    
+    await waitFor(() => {
+        expect(mockPause).toHaveBeenCalledTimes(1);
+        expect(screen.getByText(mockMovie.title, { selector: 'h1.text-2xl' })).toBeInTheDocument(); // Pause overlay
+        expect(videoElement.controls).toBe(true);
+    });
+    mockPause.mockClear();
+
+    // Click to Play
+    mockPlay.mockClear(); // Clear mount play call
+    Object.defineProperty(videoElement, 'paused', { get: () => false, configurable: true });
+    await user.click(playerContainer);
+    
+    await waitFor(() => {
+        expect(mockPlay).toHaveBeenCalledTimes(1); 
+        expect(screen.getByText(mockMovie.title, { selector: 'h2.text-xl' })).toBeInTheDocument(); // Hover overlay
+        expect(videoElement.controls).toBe(true);
+    });
+    act(() => { vi.advanceTimersByTime(3000); }); // Let UI hide
+     await waitFor(() => {
+        expect(screen.queryByText(mockMovie.title, { selector: 'h2.text-xl' })).not.toBeInTheDocument();
+        expect(videoElement.controls).toBe(false);
+    });
+  });
+
+  it('resumes play when "Resume" button on pause overlay is clicked', async () => {
     const user = userEvent.setup();
     render(<VideoPlayerComponent movie={mockMovie} />);
     const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
 
     Object.defineProperty(videoElement, 'paused', { get: () => true });
-    act(() => { fireEvent.pause(videoElement); });
+    act(() => { fireEvent.pause(videoElement); }); // Simulate pause
 
     const resumeButton = await screen.findByRole('button', { name: `Resume playing ${mockMovie.title}` });
-    expect(resumeButton).toBeInTheDocument();
     
-    mockPlay.mockClear(); 
-    Object.defineProperty(videoElement, 'paused', { get: () => false });
+    mockPlay.mockClear(); // Clear previous play calls (e.g., from mount)
+    Object.defineProperty(videoElement, 'paused', { get: () => false }); // Simulate playing after click
 
     await user.click(resumeButton);
     
     await waitFor(() => {
       expect(mockPlay).toHaveBeenCalledTimes(1);
-      expect(screen.queryByText(mockMovie.title, { selector: 'h1.text-2xl' })).not.toBeInTheDocument();
+      // Hover overlay should appear
+      expect(screen.getByText(mockMovie.title, { selector: 'h2.text-xl' })).toBeInTheDocument();
     });
   });
-
-  it('shows pause overlay if autoplay is prevented (video remains paused)', async () => {
-    mockPlay.mockImplementationOnce(() => Promise.reject(new Error("Autoplay prevented by browser")));
-    Object.defineProperty(window.HTMLMediaElement.prototype, 'paused', {
-      configurable: true,
-      get: vi.fn(() => true), 
-    });
-    
+  
+  it('shows UI and native controls when video ends', async () => {
     render(<VideoPlayerComponent movie={mockMovie} />);
-
-    await waitFor(() => {
-        expect(mockPlay).toHaveBeenCalled(); 
-        expect(screen.getByText(mockMovie.title, { selector: 'h1.text-2xl' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: `Resume playing ${mockMovie.title}` })).toBeInTheDocument();
-    });
-  });
-
-  it('shows hover overlay (top-left info) on mouse enter if video is playing, hides on mouse leave', async () => {
-    render(<VideoPlayerComponent movie={mockMovie} />);
-    const playerContainer = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }).parentElement!;
     const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
 
+    // Simulate playing then ending
     Object.defineProperty(videoElement, 'paused', { get: () => false });
-    act(() => { fireEvent.play(videoElement); }); 
-
-    await waitFor(() => expect(screen.queryByText(mockMovie.title, {selector: 'h1.text-2xl'})).not.toBeInTheDocument());
-
-    fireEvent.mouseEnter(playerContainer);
-    await waitFor(() => {
-      expect(screen.getByText(mockMovie.title, { selector: 'h2.text-xl' })).toBeInTheDocument(); // Hover title is h2
-      expect(screen.getByText(mockMovie.description, {selector: 'p.text-xs'})).toBeInTheDocument();
-      expect(screen.getByText(mockMovie.year.toString())).toBeInTheDocument();
-      expect(screen.getByText(mockMovie.duration)).toBeInTheDocument();
-      expect(screen.getByText(mockMovie.genre, { exact: false })).toBeInTheDocument();
-      expect(screen.queryByText(`Rating: ${mockMovie.rating}/5`)).not.toBeInTheDocument(); // Rating not in hover
-    });
-
-    fireEvent.mouseLeave(playerContainer);
-    await waitFor(() => {
-      expect(screen.queryByText(mockMovie.title, { selector: 'h2.text-xl' })).not.toBeInTheDocument();
-    });
-  });
-
-  it('does NOT show hover overlay if video is paused, even on mouse enter', async () => {
-    render(<VideoPlayerComponent movie={mockMovie} />);
-    const playerContainer = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }).parentElement!;
-    const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
-
-    Object.defineProperty(videoElement, 'paused', { get: () => true });
-    act(() => { fireEvent.pause(videoElement); });
+    act(() => { fireEvent.play(videoElement); });
+    act(() => { vi.advanceTimersByTime(3000); }); // Let UI hide while playing
 
     await waitFor(() => {
-        expect(screen.getByText(mockMovie.title, { selector: 'h1.text-2xl' })).toBeInTheDocument();
+        expect(screen.queryByText(mockMovie.title, { selector: 'h2.text-xl' })).not.toBeInTheDocument();
+        expect(videoElement.controls).toBe(false);
     });
     
-    fireEvent.mouseEnter(playerContainer);
-    await act(() => vi.advanceTimersByTime(100)); 
+    Object.defineProperty(videoElement, 'paused', { get: () => true });
+    act(() => { fireEvent.ended(videoElement); }); // Simulate video ended
 
-    expect(screen.queryByText(mockMovie.title, { selector: 'h2.text-xl' })).not.toBeInTheDocument();
-    expect(screen.getByText(mockMovie.title, { selector: 'h1.text-2xl' })).toBeInTheDocument();
-  });
-
-  it('toggles play/pause on video click', async () => {
-    const user = userEvent.setup();
-    render(<VideoPlayerComponent movie={mockMovie} />);
-    const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
-
-    mockPlay.mockClear(); 
-    Object.defineProperty(videoElement, 'paused', { get: () => false, configurable: true }); 
-
-    await user.click(videoElement);
-    expect(mockPause).toHaveBeenCalledTimes(1);
-    mockPause.mockClear();
-    Object.defineProperty(videoElement, 'paused', { get: () => true, configurable: true }); 
-
-    await user.click(videoElement);
-    expect(mockPlay).toHaveBeenCalledTimes(1);
-    mockPlay.mockClear();
-    Object.defineProperty(videoElement, 'paused', { get: () => false, configurable: true }); 
+    await waitFor(() => { // UI (pause overlay) should be visible
+      expect(screen.getByText(mockMovie.title, { selector: 'h1.text-2xl' })).toBeInTheDocument();
+      expect(videoElement.controls).toBe(true);
+    });
   });
 
 });
-

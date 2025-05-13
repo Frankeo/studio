@@ -1,8 +1,7 @@
-
 "use client";
 
 import type { Movie } from '@/types/movie';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play } from 'lucide-react';
 
@@ -12,39 +11,112 @@ interface VideoPlayerProps {
 
 export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isPaused, setIsPaused] = useState(true); // Start as paused to handle autoplay policies
-  const [isHovering, setIsHovering] = useState(false);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const [isPaused, setIsPaused] = useState(true); // Assume paused initially until playback starts
+  const [showPlayerUI, setShowPlayerUI] = useState(true); // Controls visibility of custom overlays and native controls
+  const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearUiTimeout = useCallback(() => {
+    if (uiTimeoutRef.current) {
+      clearTimeout(uiTimeoutRef.current);
+      uiTimeoutRef.current = null;
+    }
+  }, []);
+
+  const startUiHideTimer = useCallback(() => {
+    clearUiTimeout();
+    // Only start timer if video is actually playing
+    if (videoRef.current && !videoRef.current.paused) {
+      uiTimeoutRef.current = setTimeout(() => {
+        setShowPlayerUI(false);
+      }, 3000); // Hide after 3 seconds of inactivity
+    }
+  }, [clearUiTimeout]);
 
   useEffect(() => {
-    const videoElement = videoRef.current;
-    if (videoElement) {
-      const handlePlay = () => setIsPaused(false);
-      const handlePause = () => setIsPaused(true);
-      
-      videoElement.addEventListener('play', handlePlay);
-      videoElement.addEventListener('playing', handlePlay);
-      videoElement.addEventListener('pause', handlePause);
+    const video = videoRef.current;
+    if (!video) return;
 
-      videoElement.play().then(() => {
-        setIsPaused(false);
-      }).catch((error) => {
-        console.warn("Autoplay prevented or failed:", error);
-        setIsPaused(true); 
-      });
+    const handlePlay = () => {
+      setIsPaused(false);
+      setShowPlayerUI(true); // Show UI when play starts
+      startUiHideTimer();    // And start timer to hide it
+    };
 
-      return () => {
-        videoElement.removeEventListener('play', handlePlay);
-        videoElement.removeEventListener('playing', handlePlay);
-        videoElement.removeEventListener('pause', handlePause);
-      };
-    }
-  }, [movie.id]);
+    const handlePause = () => {
+      setIsPaused(true);
+      setShowPlayerUI(true); // UI always visible when paused
+      clearUiTimeout();      // No auto-hide when paused
+    };
+    
+    const handleEnded = () => {
+      setIsPaused(true);
+      setShowPlayerUI(true); // UI visible when ended
+      clearUiTimeout();
+    };
 
-  const handleResumePlay = () => {
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('playing', handlePlay); // `playing` is often more reliable for UI updates
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('ended', handleEnded);
+
+    // Attempt to play, then set initial state based on actual playback
+    video.play().then(() => {
+      // Autoplay started, 'play' or 'playing' event will handle state
+    }).catch(() => {
+      // Autoplay failed or was prevented
+      setIsPaused(true); // Ensure isPaused is true if play() fails
+      setShowPlayerUI(true); // And UI is visible
+    });
+    // Sync isPaused with the actual video state after attempting to play
+    setIsPaused(video.paused);
+
+
+    return () => {
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('playing', handlePlay);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('ended', handleEnded);
+      clearUiTimeout();
+    };
+  }, [movie.id, startUiHideTimer, clearUiTimeout]);
+
+  // Manage native controls visibility based on showPlayerUI state
+  useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.play();
+      videoRef.current.controls = showPlayerUI;
+    }
+  }, [showPlayerUI]);
+
+  const handleMouseMoveOnPlayer = useCallback(() => {
+    setShowPlayerUI(true); // Always show UI on mouse move
+    if (videoRef.current && !videoRef.current.paused) {
+      startUiHideTimer(); // Restart hide timer if playing
+    }
+  }, [startUiHideTimer]);
+  
+  const handleMouseLeavePlayer = useCallback(() => {
+    // When mouse leaves, if video is playing, the existing timer will eventually hide the UI.
+    // No immediate action needed here unless specific behavior is desired on leave.
+    // This setup ensures UI hides due to inactivity, not just leaving the player area.
+  }, []);
+
+
+  const togglePlayPause = () => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+      } else {
+        videoRef.current.pause();
+      }
     }
   };
+  
+  const handleResumePlay = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent click from bubbling to video element's toggle
+    videoRef.current?.play();
+  };
+
 
   if (!movie.videoUrl) {
     return (
@@ -57,41 +129,30 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
   return (
     <div 
+      ref={playerContainerRef}
       className="relative aspect-video w-full bg-black rounded-lg overflow-hidden shadow-2xl"
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
+      onMouseMove={handleMouseMoveOnPlayer}
+      onMouseLeave={handleMouseLeavePlayer} // Keep for potential future use, current logic relies on timeout
+      onClick={togglePlayPause} // Click on container (excluding overlays) toggles play/pause
     >
       <video
         ref={videoRef}
         src={movie.videoUrl}
-        controls
+        // controls attribute is managed by useEffect based on showPlayerUI
         className="w-full h-full"
         poster={movie.posterUrl || `https://picsum.photos/seed/${movie.id}-poster/1280/720`}
         aria-label={`Video player for ${movie.title}`}
         data-ai-hint="movie video"
-        onClick={(e) => { 
-            if (videoRef.current) {
-                // Prevent default browser behavior for click on video element,
-                // ensuring our custom logic takes precedence.
-                e.preventDefault();
-                // If overlay is not active, then toggle play/pause.
-                if (videoRef.current.paused) {
-                    videoRef.current.play();
-                } else {
-                    videoRef.current.pause();
-                }
-            }
-        }}
+        // onClick is handled by the parent div to avoid conflicts with overlay clicks
       >
         Your browser does not support the video tag.
       </video>
 
       {/* Pause Overlay */}
-      {isPaused && (
+      {isPaused && showPlayerUI && (
         <div 
             className="absolute inset-0 bg-black/80 z-20"
-            // Stop propagation so clicking on info part of overlay doesn't trigger video's onClick if it's also listening
-            onClick={(e) => e.stopPropagation()} 
+            onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to video toggle
         >
           {/* Info Section - Top Left */}
           <div className="absolute top-0 left-0 p-4 md:p-6 max-w-sm text-white">
@@ -113,7 +174,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           {/* Resume Button - Center */}
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
             <Button 
-                onClick={(e) => { e.stopPropagation(); handleResumePlay(); }} 
+                onClick={handleResumePlay} 
                 className="bg-primary hover:bg-primary/90 text-primary-foreground p-6 md:p-8 rounded-full shadow-xl transform transition-all hover:scale-110 focus:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-black/50"
                 aria-label={`Resume playing ${movie.title}`}
             >
@@ -123,8 +184,8 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         </div>
       )}
 
-      {/* Hover Info Overlay (Top-Left) */}
-      {isHovering && !isPaused && (
+      {/* Hover Info Overlay (Top-Left) - Shown when playing and UI is active */}
+      {!isPaused && showPlayerUI && (
         <div
           className="absolute top-0 left-0 h-full w-full max-w-xs sm:max-w-sm md:max-w-md bg-gradient-to-r from-black/80 via-black/60 to-transparent p-4 md:p-6 flex flex-col justify-start text-white transition-opacity duration-300 ease-in-out pointer-events-none z-10"
         >
@@ -146,4 +207,3 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     </div>
   );
 }
-

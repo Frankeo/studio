@@ -155,22 +155,54 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     videoRef.current?.play();
   };
 
-  const toggleFullscreen = (e?: React.MouseEvent) => {
+  const toggleFullscreen = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!playerContainerRef.current) return;
-    const el = playerContainerRef.current as any;
 
-    if (!isFullscreen) {
-      if (el.requestFullscreen) el.requestFullscreen();
-      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-      else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
-      else if (el.msRequestFullscreen) el.msRequestFullscreen();
-    } else {
-      const doc = document as any;
-      if (doc.exitFullscreen) doc.exitFullscreen();
-      else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
-      else if (doc.mozCancelFullScreen) doc.mozCancelFullScreen();
-      else if (doc.msExitFullscreen) doc.msExitFullscreen();
+    const playerElement = playerContainerRef.current as any;
+
+    try {
+      if (!isFullscreen) {
+        if (playerElement.requestFullscreen) {
+          await playerElement.requestFullscreen();
+        } else if (playerElement.webkitRequestFullscreen) { // Safari
+          await playerElement.webkitRequestFullscreen();
+        } else if (playerElement.mozRequestFullScreen) { // Firefox
+          await playerElement.mozRequestFullScreen();
+        } else if (playerElement.msRequestFullscreen) { // IE/Edge
+          await playerElement.msRequestFullscreen();
+        }
+
+        if (typeof window !== 'undefined' && window.screen && window.screen.orientation && typeof window.screen.orientation.lock === 'function') {
+          try {
+            await window.screen.orientation.lock('landscape');
+          } catch (err) {
+            console.warn("Screen orientation lock failed:", err);
+          }
+        }
+      } else {
+        const doc = document as any;
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) { // Safari
+          await doc.webkitExitFullscreen();
+        } else if (doc.mozCancelFullScreen) { // Firefox
+          await doc.mozCancelFullScreen();
+        } else if (doc.msExitFullscreen) { // IE/Edge
+          await doc.msExitFullscreen();
+        }
+
+        if (typeof window !== 'undefined' && window.screen && window.screen.orientation && typeof window.screen.orientation.unlock === 'function') {
+          try {
+            window.screen.orientation.unlock();
+          } catch (err) {
+            console.warn("Screen orientation unlock failed:", err);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Fullscreen API error:", error);
+      // Potentially update UI or show a toast if fullscreen fails
     }
   };
 
@@ -354,3 +386,4 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     </div>
   );
 }
+

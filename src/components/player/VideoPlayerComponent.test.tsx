@@ -131,6 +131,18 @@ describe('VideoPlayerComponent', () => {
     (document as any).mozCancelFullScreen = vi.fn(() => Promise.resolve());
     (document as any).msExitFullscreen = vi.fn(() => Promise.resolve());
 
+    // Mock window.screen.orientation
+    Object.defineProperty(window, 'screen', {
+      configurable: true,
+      value: {
+        ...window.screen,
+        orientation: {
+          lock: vi.fn(() => Promise.resolve()),
+          unlock: vi.fn(() => Promise.resolve()),
+          type: 'landscape-primary',
+        },
+      },
+    });
   });
 
   afterEach(() => {
@@ -275,26 +287,41 @@ describe('VideoPlayerComponent', () => {
       });
     });
 
-    it('toggles fullscreen via fullscreen button', async () => {
+    it('toggles fullscreen via fullscreen button and attempts orientation lock/unlock', async () => {
       const user = userEvent.setup();
       render(<VideoPlayerComponent movie={mockMovie} />);
       
       const enterFullscreenButton = screen.getByLabelText('Enter fullscreen');
       await user.click(enterFullscreenButton);
       await waitFor(() => {
-        expect(mockPlayerContainerElement.requestFullscreen).toHaveBeenCalledTimes(1);
+        const requestFullscreenMock = mockPlayerContainerElement.requestFullscreen ||
+                                    mockPlayerContainerElement.webkitRequestFullscreen ||
+                                    mockPlayerContainerElement.mozRequestFullScreen ||
+                                    mockPlayerContainerElement.msRequestFullscreen;
+        expect(requestFullscreenMock).toHaveBeenCalledTimes(1);
+        if (window.screen?.orientation?.lock) {
+            expect(window.screen.orientation.lock).toHaveBeenCalledWith('landscape');
+        }
       });
 
       // Simulate fullscreen change
-      Object.defineProperty(document, 'fullscreenElement', { get: () => mockPlayerContainerElement as HTMLElement });
+      Object.defineProperty(document, 'fullscreenElement', { get: () => mockPlayerContainerElement as HTMLElement, configurable: true });
       act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
       
       const exitFullscreenButton = await screen.findByLabelText('Exit fullscreen');
       await user.click(exitFullscreenButton);
       await waitFor(() => {
-        expect(document.exitFullscreen).toHaveBeenCalledTimes(1);
+        const exitFullscreenMock = document.exitFullscreen ||
+                                   (document as any).webkitExitFullscreen ||
+                                   (document as any).mozCancelFullScreen ||
+                                   (document as any).msExitFullscreen;
+        expect(exitFullscreenMock).toHaveBeenCalledTimes(1);
+
+        if (window.screen?.orientation?.unlock) {
+            expect(window.screen.orientation.unlock).toHaveBeenCalled();
+        }
       });
-       Object.defineProperty(document, 'fullscreenElement', { get: () => null });
+       Object.defineProperty(document, 'fullscreenElement', { get: () => null, configurable: true });
        act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
        expect(await screen.findByLabelText('Enter fullscreen')).toBeInTheDocument();
     });
@@ -421,3 +448,4 @@ describe('VideoPlayerComponent', () => {
     });
   });
 });
+

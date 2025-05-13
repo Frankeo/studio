@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Movie } from '@/types/movie';
@@ -74,8 +75,12 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         poster={movie.posterUrl || `https://picsum.photos/seed/${movie.id}-poster/1280/720`}
         aria-label={`Video player for ${movie.title}`}
         data-ai-hint="movie video"
-        onClick={() => { 
+        onClick={(e) => { 
             if (videoRef.current) {
+                // Prevent default browser behavior for click on video element,
+                // ensuring our custom logic takes precedence.
+                e.preventDefault();
+
                 // If the main pause overlay is active, do nothing on direct video click.
                 // Interaction should be through the overlay's "Resume Play" button.
                 if (isPaused) {

@@ -114,11 +114,10 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
             <Button 
                 onClick={(e) => { e.stopPropagation(); handleResumePlay(); }} 
-                size="lg" 
-                className="bg-primary hover:bg-primary/90 text-primary-foreground text-base md:text-lg px-6 py-3 md:px-8 md:py-4 rounded-full shadow-lg"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground p-4 md:p-5 rounded-full shadow-xl transform transition-all hover:scale-110 focus:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-black/50"
                 aria-label={`Resume playing ${movie.title}`}
             >
-              <Play className="mr-2 h-6 w-6 md:h-7 md:w-7" fill="currentColor" /> Resume Play
+              <Play className="h-10 w-10 md:h-12 md:w-12" fill="currentColor" />
             </Button>
           </div>
         </div>
@@ -147,3 +146,4 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     </div>
   );
 }
+

@@ -99,7 +99,7 @@ describe('VideoPlayerComponent', () => {
     });
   });
 
-  it('shows pause overlay with top-left info and centered button when video is paused', async () => {
+  it('shows pause overlay with top-left info and centered icon-only resume button when video is paused', async () => {
     render(<VideoPlayerComponent movie={mockMovie} />);
     const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
 
@@ -111,22 +111,27 @@ describe('VideoPlayerComponent', () => {
 
     await waitFor(() => {
       // Info section content (should be top-left)
-      expect(screen.getByText(mockMovie.title, { selector: 'h1.text-2xl' })).toBeInTheDocument(); // More specific selector
-      expect(screen.getByText(mockMovie.description, {selector: 'p.text-sm'})).toBeInTheDocument(); // More specific selector
+      expect(screen.getByText(mockMovie.title, { selector: 'h1.text-2xl' })).toBeInTheDocument();
+      expect(screen.getByText(mockMovie.description, {selector: 'p.text-sm'})).toBeInTheDocument();
       expect(screen.getByText(mockMovie.year.toString())).toBeInTheDocument();
       expect(screen.getByText(mockMovie.duration)).toBeInTheDocument();
       expect(screen.getByText(mockMovie.genre, { exact: false })).toBeInTheDocument();
       expect(screen.getByText(`Rating: ${mockMovie.rating}/5`)).toBeInTheDocument();
       
-      // Resume button (should be centered)
+      // Resume button (should be centered and icon-only, check by aria-label)
       const resumeButton = screen.getByRole('button', { name: `Resume playing ${mockMovie.title}` });
       expect(resumeButton).toBeInTheDocument();
+      // Check for Play icon inside the button (lucide-react often renders svg)
+      expect(resumeButton.querySelector('svg')).toBeInTheDocument(); 
+      // Check that the button does not contain text like "Resume Play"
+      expect(resumeButton.textContent).toBe(""); // Or check for absence of specific text if icon has title/desc
+
       // Check for classes that imply centering (approximate check)
       expect(resumeButton.parentElement).toHaveClass('absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2');
     });
   });
 
-  it('hides pause overlay and resumes play when "Resume Play" button on pause overlay is clicked', async () => {
+  it('hides pause overlay and resumes play when "Resume" button (icon-only) on pause overlay is clicked', async () => {
     const user = userEvent.setup();
     render(<VideoPlayerComponent movie={mockMovie} />);
     const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }) as HTMLVideoElement;
@@ -229,3 +234,4 @@ describe('VideoPlayerComponent', () => {
   });
 
 });
+

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { signInWithEmail, signInWithGoogle } from '@/lib/firebase/authService';
+import { useAuth } from '@/context/AuthContext'; // Use AuthContext
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +18,7 @@ import Link from 'next/link';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  password: z.string().min(1, { message: 'Password cannot be empty' }), // Min 1 for mock 'admin'
 });
 
 type LoginFormInputs = z.infer<typeof loginSchema>;
@@ -25,6 +26,7 @@ type LoginFormInputs = z.infer<typeof loginSchema>;
 export default function LoginForm() {
   const router = useRouter();
   const { toast } = useToast();
+  const { signInWithEmail, signInWithGoogle } = useAuth(); // Get methods from context
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 

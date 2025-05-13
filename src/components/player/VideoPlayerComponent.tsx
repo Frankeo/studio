@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Movie } from '@/types/movie';
@@ -11,17 +12,20 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    // You might want to add custom controls or event listeners here
-    // For example,plyr.io or video.js could be integrated for a richer player experience
     if (videoRef.current) {
       videoRef.current.focus();
     }
   }, []);
 
+  // The videoUrl is now expected to be either a real URL or the MOCK_VIDEO_URL
+  // from the data source (firestoreService or mockData).
   if (!movie.videoUrl) {
+    // This case should ideally not be hit if data sources are robust.
+    // It acts as a final fallback.
     return (
       <div className="aspect-video w-full bg-black flex items-center justify-center text-foreground">
         <p>Video source not available for {movie.title}.</p>
+        <p className="text-sm text-muted-foreground" data-ai-hint="video unavailable message">This might be due to missing configuration or data.</p>
       </div>
     );
   }
@@ -34,7 +38,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         controls
         autoPlay
         className="w-full h-full"
-        poster={movie.posterUrl}
+        poster={movie.posterUrl || `https://picsum.photos/seed/${movie.id}-poster/1280/720`}
         aria-label={`Video player for ${movie.title}`}
         data-ai-hint="movie video"
       >

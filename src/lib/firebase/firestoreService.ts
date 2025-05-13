@@ -1,18 +1,20 @@
-import { db } from './config';
+
+import { db, isFirebaseConfigured } from './config';
 import type { Movie } from '@/types/movie';
-import { collection, getDocs, doc, getDoc, query, limit, startAfter, DocumentSnapshot } from 'firebase/firestore';
+import { mockMovies, MOCK_VIDEO_URL } from '../mockData';
+import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
 
 const MOVIES_COLLECTION = 'movies';
 
 // Helper to convert Firestore doc to Movie type
-const mapDocToMovie = (doc: DocumentSnapshot): Movie => {
-  const data = doc.data();
+const mapDocToMovie = (docSnap: QueryDocumentSnapshot | DocumentSnapshot): Movie => {
+  const data = docSnap.data();
   return {
-    id: doc.id,
+    id: docSnap.id,
     title: data?.title || 'Untitled',
     description: data?.description || '',
-    posterUrl: data?.posterUrl || '',
-    videoUrl: data?.videoUrl || '',
+    posterUrl: data?.posterUrl || `https://picsum.photos/seed/${docSnap.id}/300/450`,
+    videoUrl: data?.videoUrl || MOCK_VIDEO_URL, // Fallback to mock video URL if not present
     genre: data?.genre || 'Unknown',
     duration: data?.duration || 'N/A',
     rating: data?.rating || 0,
@@ -26,6 +28,31 @@ interface PaginatedMoviesResult {
 }
 
 export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot | null = null): Promise<PaginatedMoviesResult> => {
+  if (!isFirebaseConfigured || !db) {
+    console.warn("Firebase not configured. Returning mock movies.");
+    const startIndex = lastDoc ? mockMovies.findIndex(m => m.id === (lastDoc as any).mockId) + 1 : 0;
+    if (lastDoc && startIndex === 0) { // lastDoc was provided but not found in mockMovies (or was the last one)
+        return { movies: [], lastVisible: null };
+    }
+    
+    const paginatedMockMovies = mockMovies.slice(startIndex, startIndex + pageSize);
+    
+    let newMockLastVisible: DocumentSnapshot | null = null;
+    if (paginatedMockMovies.length > 0 && (startIndex + paginatedMockMovies.length) < mockMovies.length) {
+        // Create a mock DocumentSnapshot-like object for pagination
+        newMockLastVisible = { 
+            id: 'mockLastVisible', // Not a real Firestore ID, just for logic
+            mockId: paginatedMockMovies[paginatedMockMovies.length - 1].id, // Store the actual last movie ID for next fetch
+            data: () => ({}), 
+            exists: () => true,
+            get: (fieldPath:string) => undefined,
+            ref: {} as any,
+        } as unknown as DocumentSnapshot;
+    }
+    
+    return { movies: paginatedMockMovies, lastVisible: newMockLastVisible };
+  }
+
   try {
     const moviesRef = collection(db, MOVIES_COLLECTION);
     let q;
@@ -43,14 +70,18 @@ export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot
     return { movies, lastVisible: newLastVisible };
   } catch (error) {
     console.error("Error fetching movies: ", error);
-    // data-ai-hint: Ensure your Firestore has a 'movies' collection with documents.
-    // Each document should have fields like title, description, posterUrl, videoUrl, genre, duration, rating, year.
-    // Check Firestore security rules to allow reads on this collection.
     return { movies: [], lastVisible: null };
   }
 };
 
 export const getMovieById = async (id: string): Promise<Movie | null> => {
+  if (!isFirebaseConfigured || !db) {
+    console.warn(`Firebase not configured. Returning mock movie by ID: ${id}.`);
+    const movie = mockMovies.find(m => m.id === id);
+    if (movie) return { ...movie, videoUrl: movie.videoUrl || MOCK_VIDEO_URL }; // Ensure MOCK_VIDEO_URL fallback
+    return null;
+  }
+
   try {
     const docRef = doc(db, MOVIES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
@@ -66,17 +97,3 @@ export const getMovieById = async (id: string): Promise<Movie | null> => {
     return null;
   }
 };
-
-// Example: Add a movie (for testing or seeding)
-// import { addDoc } from 'firebase/firestore';
-// export const addMovie = async (movieData: Omit<Movie, 'id'>) => {
-//   try {
-//     const docRef = await addDoc(collection(db, MOVIES_COLLECTION), movieData);
-//     console.log("Document written with ID: ", docRef.id);
-//     return docRef.id;
-//   } catch (e) {
-//     console.error("Error adding document: ", e);
-//   }
-// };
-// Sample movie data for seeding (run this once if needed, e.g., in a script or dev tool):
-// addMovie({ title: "Sample Movie", description: "A great sample movie.", posterUrl: "https://picsum.photos/300/450", videoUrl: "YOUR_VIDEO_URL", genre: "Action", duration: "1h 30m", rating: 4.5, year: 2023 });

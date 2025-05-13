@@ -1,9 +1,9 @@
+
 "use client";
 
 import Link from 'next/link';
 import { Clapperboard, LogOut, UserCircle } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-import { signOutUser } from '@/lib/firebase/authService';
+import { useAuth } from '@/context/AuthContext'; // Use AuthContext
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,14 +15,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from '@/hooks/use-toast';
 
 export default function Header() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth(); // Get user and signOut from context
   const router = useRouter();
+  const { toast } = useToast();
 
   const handleLogout = async () => {
-    await signOutUser();
-    router.push('/login');
+    try {
+      await signOut();
+      router.push('/login');
+      toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+    } catch (error: any) {
+      toast({
+        title: 'Logout Failed',
+        description: error.message || 'An unexpected error occurred during logout.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -45,7 +56,7 @@ export default function Header() {
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || 'User'} />
                     <AvatarFallback>
-                      <UserCircle className="h-6 w-6" />
+                      {user.displayName ? user.displayName.charAt(0).toUpperCase() : <UserCircle className="h-6 w-6" />}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -54,7 +65,7 @@ export default function Header() {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">{user.displayName || user.email}</p>
-                    {user.displayName && <p className="text-xs leading-none text-muted-foreground">{user.email}</p>}
+                    {user.displayName && user.email && <p className="text-xs leading-none text-muted-foreground">{user.email}</p>}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

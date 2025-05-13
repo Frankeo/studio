@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Movie } from '@/types/movie';
@@ -25,6 +24,12 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       videoElement.addEventListener('playing', handlePlay);
       videoElement.addEventListener('pause', handlePause);
 
+      // Attempt to play, but set isPaused to true if it fails (e.g. autoplay blocked)
+      // or if it's already paused by default.
+      if (videoElement.paused) {
+        setIsPaused(true); // Ensure initial state reflects video's actual paused state.
+      }
+      
       videoElement.play().then(() => {
         setIsPaused(false);
       }).catch((error) => {
@@ -71,8 +76,17 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         data-ai-hint="movie video"
         onClick={() => { 
             if (videoRef.current) {
-                if (videoRef.current.paused) videoRef.current.play();
-                else videoRef.current.pause();
+                // If the main pause overlay is active, do nothing on direct video click.
+                // Interaction should be through the overlay's "Resume Play" button.
+                if (isPaused) {
+                    return;
+                }
+                // If overlay is not active, then toggle play/pause.
+                if (videoRef.current.paused) {
+                    videoRef.current.play();
+                } else {
+                    videoRef.current.pause();
+                }
             }
         }}
       >
@@ -140,3 +154,4 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     </div>
   );
 }
+

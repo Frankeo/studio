@@ -3,7 +3,7 @@ import type { Movie } from '@/types/movie';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
-import { Play, Info, PlusCircle } from 'lucide-react';
+import { Play, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
@@ -54,7 +54,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
               </Button>
             </div>
 
-            {/* Bottom section of overlay: Title, Genre, Play/Info buttons */}
+            {/* Bottom section of overlay: Title, Genre, Play button */}
             <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 ease-out delay-50">
               <h3 className="text-sm sm:text-base font-bold text-white mb-1 line-clamp-2 shadow-text">
                 {movie.title}
@@ -65,23 +65,12 @@ export default function MovieCard({ movie }: MovieCardProps) {
               <div className="flex items-center space-x-2">
                 <Button
                   size="sm"
-                  className="flex-grow bg-primary/90 hover:bg-primary text-primary-foreground"
+                  className="flex-grow bg-primary/90 hover:bg-primary text-primary-foreground animate-pulse group-hover:animate-none"
                   aria-label={`Play ${movie.title}`}
-                  // Parent Link handles navigation, this button is primarily for visual cue and can trigger play directly if needed.
+                  // Parent Link handles navigation.
                 >
                   <Play className="h-4 w-4 mr-1.5" fill="currentColor" />
                   Play
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="border-neutral-400/70 text-neutral-200 hover:bg-white/20 hover:text-white h-9 w-9"
-                  aria-label="More information"
-                  title="More information"
-                  // This button can also trigger a modal or navigate if e.preventDefault() is used.
-                  // For now, it is part of the card link area.
-                >
-                  <Info className="h-4 w-4" />
                 </Button>
               </div>
             </div>

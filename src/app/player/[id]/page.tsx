@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -10,12 +11,14 @@ import VideoPlayerComponent from '@/components/player/VideoPlayerComponent';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast'; // Corrected import path
 
 export default function PlayerPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
   const movieId = params.id as string;
+  const { toast } = useToast(); // useToast hook
 
   const [movie, setMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +37,6 @@ export default function PlayerPage() {
           if (data) {
             setMovie(data);
           } else {
-            // Movie not found, redirect or show error
             toast({ title: "Error", description: "Movie not found.", variant: "destructive" });
             router.replace('/catalog');
           }
@@ -45,14 +47,9 @@ export default function PlayerPage() {
         })
         .finally(() => setIsLoading(false));
     } else if (!authLoading && !user) {
-      // User is not logged in and auth is not loading, redirect
       router.replace('/login');
     }
-     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, movieId, router, authLoading]); // Added toast to deps
-
-  // This local toast import is fine if useToast is not available globally or for specific errors
-  const { toast } = (typeof window !== "undefined" ? require('@/hooks/use-toast') : { toast: () => {} });
+  }, [user, movieId, router, authLoading, toast]);
 
 
   if (authLoading || isLoading) {
@@ -109,6 +106,8 @@ export default function PlayerPage() {
         
         <VideoPlayerComponent movie={movie} />
 
+        {/* Movie details section below player is removed, as info is now in pause overlay */}
+        {/* 
         <div className="mt-8 p-6 bg-card rounded-lg shadow-lg">
           <h1 className="text-3xl font-bold text-primary mb-2">{movie.title}</h1>
           <div className="flex items-center space-x-4 text-sm text-muted-foreground mb-4">
@@ -121,7 +120,8 @@ export default function PlayerPage() {
             <span>Rating: {movie.rating}/5</span>
           </div>
           <p className="text-foreground/80 leading-relaxed">{movie.description}</p>
-        </div>
+        </div> 
+        */}
       </main>
       <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border">
         © {new Date().getFullYear()} StreamVerse. All rights reserved.

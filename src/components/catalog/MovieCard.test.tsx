@@ -51,7 +51,7 @@ describe('MovieCard', () => {
     expect(screen.getByText(mockMovie.title)).toBeInTheDocument();
     expect(screen.getByText(mockMovie.genre, { exact: false })).toBeInTheDocument(); // case-insensitive and partial match due to capitalize
     expect(screen.getByRole('button', { name: `Play ${mockMovie.title}` })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /more information/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /more information/i })).not.toBeInTheDocument(); // More Info button removed
     expect(screen.getByRole('button', { name: /add to watchlist/i })).toBeInTheDocument();
   });
 
@@ -79,12 +79,6 @@ describe('MovieCard', () => {
     // We check if it's within the main link.
     expect(screen.getByRole('link', { name: `View details for ${mockMovie.title}` })).toContainElement(playButton);
 
-  });
-
-  it('More Info button is part of the link', () => {
-     render(<MovieCard movie={mockMovie} />);
-     const infoButton = screen.getByRole('button', { name: /More information/i });
-     expect(screen.getByRole('link', {name: `View details for ${mockMovie.title}`})).toContainElement(infoButton);
   });
 
    it('uses placeholder image if posterUrl is not provided', () => {

@@ -42,9 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return () => unsubscribe();
     } else {
-      console.warn("Firebase not configured. Using mock authentication. User is initially logged out.");
-      setUser(null); // User is initially logged out
-      setLoading(false); // Set loading to false as there's no auth state to wait for
+      // Firebase not configured. User is initially logged out.
+      setUser(null); 
+      setLoading(false); 
     }
   }, []);
 
@@ -64,7 +64,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false); // Manually set loading for mock auth
       }
     } catch (error) {
-      // Ensure user is null on error, especially if mock login fails or Firebase login fails before onAuthStateChanged
       setUser(null); 
       setLoading(false);
       throw error; 
@@ -81,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         // Firebase not configured
         setLoading(false);
-        throw new Error('Google Sign-In is not available in mock mode without Firebase configuration.');
+        throw new Error('Google Sign-In is not available when Firebase is not configured.');
       }
     } catch (error) {
       setUser(null); 
@@ -102,18 +101,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     } catch (error) {
-      // If Firebase sign out fails or an error occurs during mock sign out.
       setLoading(false);
       // For mock scenario, ensure user is cleared if an unexpected error happened.
-      if (!isFirebaseConfigured || !auth) { 
+      if (!isFirebaseConfigured) { 
           setUser(null);
       }
-      // Rethrow to allow UI to handle it (e.g., show toast)
       throw error;
     }
   };
 
-  if (loading && !user) { // Show loader if loading is true AND user is not yet set (initial load or during auth operations)
+  // Show loader if loading is true (initial load or during auth operations)
+  // This also covers the brief period where isFirebaseConfigured might be true
+  // but onAuthStateChanged hasn't fired yet.
+  if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -136,4 +136,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

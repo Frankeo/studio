@@ -47,11 +47,23 @@ NEXT_PUBLIC_FIREBASE_APP_ID="YOUR_APP_ID"`
   );
 } else {
   isFirebaseConfigured = true;
-  const firebaseAppInstance = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  app = firebaseAppInstance;
-  auth = getAuth(firebaseAppInstance);
-  db = getFirestore(firebaseAppInstance);
-  storage = getStorage(firebaseAppInstance);
+  // Initialize Firebase only if all keys are present
+  try {
+    const firebaseAppInstance = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    app = firebaseAppInstance;
+    auth = getAuth(firebaseAppInstance);
+    db = getFirestore(firebaseAppInstance);
+    storage = getStorage(firebaseAppInstance);
+  } catch (error) {
+    // This catch block is a fallback, though the primary check is `missingKeys`.
+    // It could catch other Firebase initialization errors.
+    console.error("Firebase initialization failed:", error);
+    isFirebaseConfigured = false;
+    app = null;
+    auth = null;
+    db = null;
+    storage = null;
+  }
 }
 
 export { firebaseConfig as firebaseConfigValues };

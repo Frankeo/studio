@@ -2,7 +2,7 @@
 import { db, isFirebaseConfigured } from './config';
 import type { Movie } from '@/types/movie';
 import { mockMovies, MOCK_VIDEO_URL } from '../mockData';
-import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, type FieldPath } from 'firebase/firestore';
 
 const MOVIES_COLLECTION = 'movies';
 
@@ -30,29 +30,55 @@ interface PaginatedMoviesResult {
 export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot | null = null): Promise<PaginatedMoviesResult> => {
   if (!isFirebaseConfigured || !db) {
     console.warn("Firebase not configured. Returning mock movies.");
-    const startIndex = lastDoc ? mockMovies.findIndex(m => m.id === (lastDoc as any).mockId) + 1 : 0;
-    if (lastDoc && startIndex === 0) { // lastDoc was provided but not found in mockMovies (or was the last one)
+
+    let startIndex = 0;
+    if (lastDoc && (lastDoc as any).mockId) {
+      const lastMockId = (lastDoc as any).mockId;
+      const lastIndex = mockMovies.findIndex(m => m.id === lastMockId);
+      
+      if (lastIndex !== -1) {
+        startIndex = lastIndex + 1;
+      } else {
+        // If lastMockId from lastDoc is not found in mockMovies,
+        // it implies an issue or end of list based on that ID.
+        // Return empty to prevent refetching page 1 or errors.
+        console.warn(`Mock ID "${lastMockId}" from lastDoc not found in mockMovies. Returning empty list.`);
         return { movies: [], lastVisible: null };
+      }
+    }
+
+    // If startIndex is already at or beyond the length of mockMovies, no more movies.
+    if (startIndex >= mockMovies.length) {
+      return { movies: [], lastVisible: null };
     }
     
     const paginatedMockMovies = mockMovies.slice(startIndex, startIndex + pageSize);
     
     let newMockLastVisible: DocumentSnapshot | null = null;
-    if (paginatedMockMovies.length > 0 && (startIndex + paginatedMockMovies.length) < mockMovies.length) {
+    // Check if there are more movies *after* the current batch
+    if (startIndex + paginatedMockMovies.length < mockMovies.length) {
         // Create a mock DocumentSnapshot-like object for pagination
+        const lastFetchedMovieInBatch = paginatedMockMovies[paginatedMockMovies.length - 1];
         newMockLastVisible = { 
-            id: 'mockLastVisible', // Not a real Firestore ID, just for logic
-            mockId: paginatedMockMovies[paginatedMockMovies.length - 1].id, // Store the actual last movie ID for next fetch
-            data: () => ({}), 
+            id: `mock-last-visible-${lastFetchedMovieInBatch.id}`, // A somewhat unique ID for the mock snapshot
+            mockId: lastFetchedMovieInBatch.id, // This is the important part for mock pagination
+            data: () => ({ ...mockMovies.find(m => m.id === lastFetchedMovieInBatch.id) }), 
             exists: () => true,
-            get: (fieldPath:string) => undefined,
-            ref: {} as any,
+            get: (fieldPath: string | number | FieldPath) => {
+                const itemData = mockMovies.find(m => m.id === lastFetchedMovieInBatch.id);
+                if (itemData && typeof fieldPath === 'string') {
+                    return (itemData as any)[fieldPath];
+                }
+                return undefined;
+            },
+            ref: { path: `${MOVIES_COLLECTION}/mock-last-visible-${lastFetchedMovieInBatch.id}` } as any,
         } as unknown as DocumentSnapshot;
     }
     
     return { movies: paginatedMockMovies, lastVisible: newMockLastVisible };
   }
 
+  // Firestore logic remains the same
   try {
     const moviesRef = collection(db, MOVIES_COLLECTION);
     let q;
@@ -97,3 +123,4 @@ export const getMovieById = async (id: string): Promise<Movie | null> => {
     return null;
   }
 };
+

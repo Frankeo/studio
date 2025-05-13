@@ -1,7 +1,8 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-import { getStorage, connectStorageEmulator } from "firebase/storage";
+
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -12,33 +13,15 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Validate environment variables
+if (!firebaseConfig.apiKey) {
+  throw new Error("Firebase API key (NEXT_PUBLIC_FIREBASE_API_KEY) is missing or empty. Please ensure it is set correctly in your .env.local file and that the Next.js development server was restarted after changes.");
+}
+
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
-
-// IMPORTANT: For local development with Firebase Emulators:
-// 1. Ensure you have the Firebase CLI installed and configured.
-// 2. Run `firebase init emulators` in your project if you haven't already.
-// 3. Start the emulators: `firebase emulators:start`
-//
-// The Firebase SDK will automatically connect to the emulators if they are running on their default ports.
-// Forcing connection for development environment:
-if (process.env.NODE_ENV === 'development') {
-  try {
-    // Make sure emulators are running before uncommenting these lines.
-    // connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
-    // connectFirestoreEmulator(db, "localhost", 8080);
-    // connectStorageEmulator(storage, "localhost", 9199);
-    console.log("Attempting to connect to Firebase emulators...");
-    // Check if emulators are already connected (Firebase SDK might do this automatically)
-    // This is a simplified check; actual connection logic is handled by the SDK.
-    // The lines above are usually sufficient. If you encounter issues,
-    // ensure your firebase.json is configured correctly for emulators.
-  } catch (error) {
-    console.error("Error connecting to Firebase emulators:", error);
-  }
-}
 
 export { app, auth, db, storage };

@@ -43,8 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return () => unsubscribe();
     } else {
       console.warn("Firebase not configured. Using mock authentication. User is initially logged out.");
-      setUser(null);
-      setLoading(false);
+      setUser(null); // User is initially logged out
+      setLoading(false); // Set loading to false as there's no auth state to wait for
     }
   }, []);
 
@@ -55,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await firebaseSignInWithEmailAndPassword(auth, email, pass);
         // onAuthStateChanged will update user and setLoading(false) for Firebase auth
       } else {
+        // Firebase not configured, use mock authentication
         if (email === MOCK_USER_CREDENTIALS.email && pass === MOCK_USER_CREDENTIALS.password) {
           setUser(mockUser);
         } else {
@@ -63,7 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false); // Manually set loading for mock auth
       }
     } catch (error) {
-      setUser(null); // Ensure user is null on error
+      // Ensure user is null on error, especially if mock login fails or Firebase login fails before onAuthStateChanged
+      setUser(null); 
       setLoading(false);
       throw error; 
     }
@@ -77,11 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await firebaseSignInWithPopup(auth, provider);
         // onAuthStateChanged will update user and setLoading(false)
       } else {
+        // Firebase not configured
         setLoading(false);
         throw new Error('Google Sign-In is not available in mock mode without Firebase configuration.');
       }
     } catch (error) {
-      setUser(null); // Ensure user is null on error
+      setUser(null); 
       setLoading(false);
       throw error;
     }
@@ -94,19 +97,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await firebaseSignOut(auth);
         // onAuthStateChanged will set user to null and setLoading(false)
       } else {
-        setUser(null); // Clear mock user
-        setLoading(false); // Manually set loading for mock auth
+        // Firebase not configured, handle mock sign out
+        setUser(null);
+        setLoading(false);
       }
     } catch (error) {
-      // For Firebase signout, user might remain if error, onAuthStateChanged handles this.
-      // For mock, ensure user is null.
-      if (!isFirebaseConfigured) setUser(null);
+      // If Firebase sign out fails or an error occurs during mock sign out.
       setLoading(false);
+      // For mock scenario, ensure user is cleared if an unexpected error happened.
+      if (!isFirebaseConfigured || !auth) { 
+          setUser(null);
+      }
+      // Rethrow to allow UI to handle it (e.g., show toast)
       throw error;
     }
   };
 
-  if (loading) { // Show loader if loading is true, regardless of user state initially
+  if (loading && !user) { // Show loader if loading is true AND user is not yet set (initial load or during auth operations)
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -129,3 +136,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

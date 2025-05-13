@@ -18,9 +18,6 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   useEffect(() => {
     const videoElement = videoRef.current;
     if (videoElement) {
-      // Focus for keyboard controls, typically handled by browser on controls/autoplay
-      // videoElement.focus(); 
-
       const handlePlay = () => setIsPaused(false);
       const handlePause = () => setIsPaused(true);
       
@@ -28,13 +25,11 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       videoElement.addEventListener('playing', handlePlay);
       videoElement.addEventListener('pause', handlePause);
 
-      // Attempt to play, then set initial state based on whether it played
       videoElement.play().then(() => {
         setIsPaused(false);
       }).catch((error) => {
-        // Autoplay was prevented (common browser policy) or another error occurred
         console.warn("Autoplay prevented or failed:", error);
-        setIsPaused(true); // Ensure it's marked as paused
+        setIsPaused(true); 
       });
 
       return () => {
@@ -43,7 +38,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         videoElement.removeEventListener('pause', handlePause);
       };
     }
-  }, [movie.id]); // Re-run if movie changes
+  }, [movie.id]);
 
   const handleResumePlay = () => {
     if (videoRef.current) {
@@ -70,12 +65,11 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         ref={videoRef}
         src={movie.videoUrl}
         controls
-        // autoPlay // Attempt autoplay, managed in useEffect now
         className="w-full h-full"
         poster={movie.posterUrl || `https://picsum.photos/seed/${movie.id}-poster/1280/720`}
         aria-label={`Video player for ${movie.title}`}
         data-ai-hint="movie video"
-        onClick={() => { // Allow clicking video to toggle play/pause if controls are hidden or for convenience
+        onClick={() => { 
             if (videoRef.current) {
                 if (videoRef.current.paused) videoRef.current.play();
                 else videoRef.current.pause();
@@ -85,15 +79,17 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         Your browser does not support the video tag.
       </video>
 
-      {/* Pause Overlay (Centered) */}
+      {/* Pause Overlay */}
       {isPaused && (
         <div 
-            className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center p-6 md:p-8 text-white transition-opacity duration-300 ease-in-out z-20"
-            // onClick={handleResumePlay} // Keep click on button for explicit action
+            className="absolute inset-0 bg-black/80 z-20"
+            // Stop propagation so clicking on info part of overlay doesn't trigger video's onClick if it's also listening
+            onClick={(e) => e.stopPropagation()} 
         >
-          <div className="text-center max-w-2xl">
-            <h1 className="text-3xl md:text-4xl font-bold mb-3 line-clamp-2 shadow-text">{movie.title}</h1>
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-neutral-300 mb-4">
+          {/* Info Section - Top Left */}
+          <div className="absolute top-0 left-0 p-4 md:p-6 max-w-sm text-white">
+            <h1 className="text-2xl md:text-3xl font-bold mb-2 line-clamp-2 shadow-text">{movie.title}</h1>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-300 mb-3">
               <span>{movie.year}</span>
               <span aria-hidden="true">&bull;</span>
               <span>{movie.duration}</span>
@@ -102,27 +98,31 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
               <span aria-hidden="true">&bull;</span>
               <span>Rating: {movie.rating}/5</span>
             </div>
-            <p className="text-neutral-200 mb-6 leading-relaxed line-clamp-3 md:line-clamp-4 shadow-text">
+            <p className="text-sm text-neutral-200 mb-4 leading-relaxed line-clamp-2 md:line-clamp-3 shadow-text">
               {movie.description}
             </p>
+          </div>
+
+          {/* Resume Button - Center */}
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
             <Button 
                 onClick={(e) => { e.stopPropagation(); handleResumePlay(); }} 
                 size="lg" 
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-base md:text-lg px-6 py-3 md:px-8 md:py-4 rounded-full shadow-lg"
                 aria-label={`Resume playing ${movie.title}`}
             >
-              <Play className="mr-2 h-5 w-5" fill="currentColor" /> Resume Play
+              <Play className="mr-2 h-6 w-6 md:h-7 md:w-7" fill="currentColor" /> Resume Play
             </Button>
           </div>
         </div>
       )}
 
-      {/* Hover Info Overlay (Left-aligned) */}
+      {/* Hover Info Overlay (Top-Left) */}
       {isHovering && !isPaused && (
         <div
-          className="absolute top-0 left-0 h-full w-full max-w-xs sm:max-w-sm md:max-w-md bg-gradient-to-r from-black/80 via-black/60 to-transparent p-4 md:p-6 flex flex-col justify-end text-white transition-opacity duration-300 ease-in-out pointer-events-none z-10"
+          className="absolute top-0 left-0 h-full w-full max-w-xs sm:max-w-sm md:max-w-md bg-gradient-to-r from-black/80 via-black/60 to-transparent p-4 md:p-6 flex flex-col justify-start text-white transition-opacity duration-300 ease-in-out pointer-events-none z-10"
         >
-          <div className="space-y-2">
+          <div className="space-y-1 md:space-y-2">
             <h2 className="text-xl md:text-2xl font-bold line-clamp-2 shadow-text">{movie.title}</h2>
             <div className="flex flex-wrap items-center gap-x-2 text-xs text-neutral-300">
               <span>{movie.year}</span>
@@ -130,7 +130,6 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
               <span>{movie.duration}</span>
               <span aria-hidden="true">&bull;</span>
               <span className="capitalize">{movie.genre}</span>
-              {/* Rating could be too much for hover, keeping it concise */}
             </div>
             <p className="text-xs md:text-sm text-neutral-200 leading-relaxed line-clamp-2 md:line-clamp-3 shadow-text">
               {movie.description}

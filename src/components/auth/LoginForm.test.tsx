@@ -2,7 +2,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LoginForm from './LoginForm';
-import type { AuthContextType } from '@/context/AuthContext'; // Import the type
+import type { AuthContextType } from '@/context/interfaces'; // Import the type
 
 // Mocks
 const mockPush = vi.fn();

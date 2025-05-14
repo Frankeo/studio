@@ -10,7 +10,7 @@ vi.mock('next/image', () => ({
     // eslint-disable-next-line jsx-a11y/alt-text, @next/next/no-img-element
     const { priority, ...rest } = props; // Destructure and ignore priority
     return React.createElement('img', rest); // Use React.createElement
-q  },
+  },
 }));
 
 // Mock next/navigation

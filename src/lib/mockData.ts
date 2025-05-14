@@ -1,5 +1,5 @@
 
-import type { User } from 'firebase/auth';
+import { ProviderId, type User } from 'firebase/auth';
 import type { Movie } from '@/types/movie';
 
 export const MOCK_VIDEO_URL = "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4";
@@ -16,6 +16,8 @@ export const mockUser: User = {
   displayName: 'Admin User',
   photoURL: `https://picsum.photos/seed/admin-${MOCK_USER_CREDENTIALS.email}/40/40`,
   emailVerified: true,
+  phoneNumber: null,
+  providerId: 'mock-admin-uid',
   isAnonymous: false,
   metadata: {
     creationTime: new Date().toISOString(),

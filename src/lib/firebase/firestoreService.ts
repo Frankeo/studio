@@ -1,7 +1,7 @@
 
 import { db, isFirebaseConfigured } from './config';
 import type { Movie } from '@/types/movie';
-import { mockMovies, MOCK_VIDEO_URL, type MockDocumentSnapshot } from '../mockData';
+import { mockMovies, MOCK_VIDEO_URL } from '../mockData';
 import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, type FieldPath } from 'firebase/firestore';
 
 const MOVIES_COLLECTION = 'movies';
@@ -27,7 +27,7 @@ interface PaginatedMoviesResult {
   lastVisible: DocumentSnapshot | null;
 }
 
-export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot | MockDocumentSnapshot | null = null): Promise<PaginatedMoviesResult> => {
+export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot | null = null): Promise<PaginatedMoviesResult> => {
   if (!isFirebaseConfigured || !db) {
     console.warn("Firebase not configured. Returning mock movies.");
 
@@ -72,7 +72,7 @@ export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot
                 return undefined;
             },
             ref: { path: `${MOVIES_COLLECTION}/mock-last-visible-${lastFetchedMovieInBatch.id}` } as any,
-        } as MockDocumentSnapshot as unknown as DocumentSnapshot; // Cast to MockDocumentSnapshot first
+        } as unknown as DocumentSnapshot; // Cast to MockDocumentSnapshot first
     }
     
     return { movies: paginatedMockMovies, lastVisible: newMockLastVisible };

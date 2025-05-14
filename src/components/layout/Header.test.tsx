@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Header from './Header';
 import type { User } from 'firebase/auth';
-import type { AuthContextType } from '@/context/AuthContext';
+import { AuthContextType } from '@/context/interfaces';
 
 
 // Mocks
@@ -29,6 +29,8 @@ const mockSignOut = vi.fn();
 
 const mockUser: User = {
   uid: 'test-uid',
+  providerId: 'test-uid',
+  phoneNumber: null,
   email: 'test@example.com',
   displayName: 'Test User',
   photoURL: 'https://picsum.photos/seed/test/40/40',

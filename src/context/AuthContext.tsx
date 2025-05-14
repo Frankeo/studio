@@ -13,14 +13,7 @@ import {
 import { auth, isFirebaseConfigured } from '@/lib/firebase/config';
 import { mockUser, MOCK_USER_CREDENTIALS } from '@/lib/mockData';
 import { Loader2 } from 'lucide-react';
-
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
-  signOut: () => Promise<void>;
-}
+import type { AuthContextType } from './interfaces';
 
 const AuthContext = createContext<AuthContextType>({ 
   user: null, 

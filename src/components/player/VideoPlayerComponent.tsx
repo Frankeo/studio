@@ -216,7 +216,8 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
   const handlePlayerClick = (e: React.MouseEvent) => {
     // Prevent player click if the click originated from a button or interactive element within controls
-    if ((e.target as HTMLElement).closest('button, [role="slider"], [role="menuitem"]')) {
+    const targetElement = e.target as HTMLElement;
+    if (targetElement.closest('button, [role="slider"], [role="menuitem"], [data-testid="video-controls-bar"]')) {
       return; 
     }
     
@@ -231,9 +232,15 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       clearUiTimeout(); // Keep UI visible if paused
     }
     
-    // On desktop, tap toggles play/pause
-    togglePlayPause(); 
-    
+    if (isMobile) {
+      // On mobile, tapping player area toggles fullscreen if not clicking on controls
+      if (!targetElement.closest('[data-testid="video-controls-bar"]')) {
+        toggleFullscreen();
+      }
+    } else {
+      // On desktop, tap toggles play/pause
+      togglePlayPause(); 
+    }
   };
 
   const handleResumePlay = (e: React.MouseEvent) => {
@@ -381,7 +388,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           max={duration || 1} // Use 1 as a fallback if duration is 0 to prevent errors
           step={0.1}
           onValueChange={(value) => handleSeek(value[0])}
-          className="w-full h-2 mb-1 md:mb-2 group [&>span:first-child]:h-1 [&>span:first-child>span]:h-1 [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:-top-1 [&>span:last-child]:border-2 group-hover:[&>span:last-child]:scale-125"
+          className="w-full h-2 mb-1 md:mb-2 group [&>span:first-child]:h-1 [&>span:first-child>span]:h-1 [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2 group-hover:[&>span:last-child]:scale-125"
           aria-label="Video progress"
         />
         {/* Controls Row */}
@@ -401,7 +408,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
                 max={1}
                 step={0.01}
                 onValueChange={(value) => handleVolumeSliderChange(value[0])}
-                className="[&>span:first-child]:h-1 [&>span:first-child>span]:h-1 [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:-top-1 group [&>span:last-child]:border-2 group-hover:[&>span:last-child]:scale-125"
+                className="[&>span:first-child]:h-1 [&>span:first-child>span]:h-1 [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2 group-hover:[&>span:last-child]:scale-125"
                 aria-label="Volume"
               />
             </div>

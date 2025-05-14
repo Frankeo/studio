@@ -5,6 +5,7 @@ import VideoPlayerComponent from './VideoPlayerComponent';
 import type { Movie } from '@/types/movie';
 import { MOCK_VIDEO_URL } from '@/lib/mockData';
 import { useIsMobile } from '@/hooks/use-mobile';
+import React from 'react'; // Import React for useRef mocking
 
 vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: vi.fn(),
@@ -32,7 +33,7 @@ let mockVideoElement: Partial<HTMLVideoElement> & {
   _muted: boolean;
   _playbackRate: number;
   _controls: boolean;
-  playsInline: boolean; // Added for testing
+  playsInline: boolean; 
   dispatchEvent: (event: Event) => boolean;
   addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
   removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
@@ -47,20 +48,24 @@ let mockPlayerContainerElement: Partial<HTMLElement> & {
 
 
 describe('VideoPlayerComponent', () => {
+  let refCallCount = 0;
+  const actualUseRef = React.useRef; // Store original React.useRef
+
   beforeEach(() => {
     vi.useFakeTimers();
     (useIsMobile as vi.Mock).mockReturnValue(false); // Default to desktop
 
+    // Initialize mockVideoElement
     mockVideoElement = {
       _listeners: {},
       _paused: true,
       _currentTime: 0,
-      _duration: 600, // 10 minutes
+      _duration: 600, 
       _volume: 1,
       _muted: false,
       _playbackRate: 1,
       _controls: false,
-      playsInline: false, // Initialize
+      playsInline: false,
 
       play: vi.fn(() => {
         mockVideoElement._paused = false;
@@ -72,40 +77,64 @@ describe('VideoPlayerComponent', () => {
         mockVideoElement._paused = true;
         act(() => mockVideoElement.dispatchEvent(new Event('pause')));
       }),
-      addEventListener: (type, listener) => {
+      addEventListener: vi.fn((type, listener) => {
         if (!mockVideoElement._listeners[type]) {
           mockVideoElement._listeners[type] = [];
         }
         mockVideoElement._listeners[type].push(listener as Function);
-      },
-      removeEventListener: (type, listener) => {
+      }),
+      removeEventListener: vi.fn((type, listener) => {
         if (mockVideoElement._listeners[type]) {
           mockVideoElement._listeners[type] = mockVideoElement._listeners[type].filter(
             (l) => l !== listener
           );
         }
-      },
-      dispatchEvent: (event: Event) => {
-        if (mockVideoElement._listeners[event.type]) {
+      }),
+      dispatchEvent: vi.fn((event: Event) => {
+        if (mockVideoElement._listeners && mockVideoElement._listeners[event.type]) {
           mockVideoElement._listeners[event.type].forEach((l) => l(event));
         }
         return true;
-      },
-      // Getter/setter for properties
-      get paused() { return mockVideoElement._paused; },
-      get currentTime() { return mockVideoElement._currentTime; },
-      set currentTime(val) { mockVideoElement._currentTime = val; act(() => mockVideoElement.dispatchEvent(new Event('timeupdate'))); },
-      get duration() { return mockVideoElement._duration; },
-      get volume() { return mockVideoElement._volume; },
-      set volume(val) { mockVideoElement._volume = val; act(() => mockVideoElement.dispatchEvent(new Event('volumechange')));},
-      get muted() { return mockVideoElement._muted; },
-      set muted(val) { mockVideoElement._muted = val; act(() => mockVideoElement.dispatchEvent(new Event('volumechange')));},
-      get playbackRate() { return mockVideoElement._playbackRate; },
-      set playbackRate(val) { mockVideoElement._playbackRate = val; /* dispatch 'ratechange' if needed */ },
-      get controls() { return mockVideoElement._controls; },
-      set controls(val) { mockVideoElement._controls = val; },
+      }),
     };
     
+    // Setup getters and setters for mockVideoElement properties
+    Object.defineProperty(mockVideoElement, 'paused', { get: () => mockVideoElement._paused, configurable: true });
+    Object.defineProperty(mockVideoElement, 'currentTime', { 
+      get: () => mockVideoElement._currentTime, 
+      set: (val) => { mockVideoElement._currentTime = val; act(() => mockVideoElement.dispatchEvent(new Event('timeupdate'))); },
+      configurable: true 
+    });
+    Object.defineProperty(mockVideoElement, 'duration', { get: () => mockVideoElement._duration, configurable: true });
+    Object.defineProperty(mockVideoElement, 'volume', { 
+      get: () => mockVideoElement._volume, 
+      set: (val) => { mockVideoElement._volume = val; act(() => mockVideoElement.dispatchEvent(new Event('volumechange')));},
+      configurable: true 
+    });
+    Object.defineProperty(mockVideoElement, 'muted', { 
+      get: () => mockVideoElement._muted, 
+      set: (val) => { mockVideoElement._muted = val; act(() => mockVideoElement.dispatchEvent(new Event('volumechange')));},
+      configurable: true 
+    });
+    Object.defineProperty(mockVideoElement, 'playbackRate', { 
+      get: () => mockVideoElement._playbackRate, 
+      set: (val) => { mockVideoElement._playbackRate = val; /* dispatch 'ratechange' if needed */ },
+      configurable: true 
+    });
+    Object.defineProperty(mockVideoElement, 'controls', { 
+      get: () => mockVideoElement._controls, 
+      set: (val) => { mockVideoElement._controls = val; },
+      configurable: true 
+    });
+     Object.defineProperty(mockVideoElement, 'playsInline', { 
+      get: () => (mockVideoElement as any)._playsInline, // Use a backing field to avoid recursion
+      set: (val) => { (mockVideoElement as any)._playsInline = val; },
+      configurable: true 
+    });
+    (mockVideoElement as any)._playsInline = false; // Initialize backing field
+
+
+    // Initialize mockPlayerContainerElement
     mockPlayerContainerElement = {
         requestFullscreen: vi.fn(() => Promise.resolve()),
         webkitRequestFullscreen: vi.fn(() => Promise.resolve()),
@@ -113,34 +142,29 @@ describe('VideoPlayerComponent', () => {
         msRequestFullscreen: vi.fn(() => Promise.resolve()),
     };
 
-    vi.spyOn(document, 'getElementById').mockImplementation(() => null); // Default mock
+    // Reset refCallCount and setup the useRef mock
+    refCallCount = 0;
     vi.spyOn(React, 'useRef').mockImplementation((initialValue) => {
-        // Check if the initialValue has a 'tagName' property and if it includes 'video'.
-        // This is a simplified check. In a real scenario, you might need a more robust way to distinguish.
-        const isVideoElement = typeof initialValue === 'object' && initialValue !== null && 
-                               (initialValue as any).tagName && 
-                               (initialValue as any).tagName.toLowerCase().includes('video');
-    
-        if (isVideoElement) {
-            return { current: mockVideoElement as HTMLVideoElement };
-        } else if (initialValue === null && !isVideoElement) { 
-             // Assumes playerContainerRef is initialized with null and isn't the video element
-             return { current: mockPlayerContainerElement as HTMLDivElement };
+        const currentCall = ++refCallCount;
+        if (initialValue === null) {
+            if (currentCall === 1) { // videoRef
+                return { current: mockVideoElement as unknown as HTMLVideoElement };
+            } else if (currentCall === 2) { // playerContainerRef
+                return { current: mockPlayerContainerElement as unknown as HTMLDivElement };
+            } else if (currentCall === 3) { // uiTimeoutRef
+                // For uiTimeoutRef, we want a real mutable ref behavior
+                return actualUseRef(null);
+            }
         }
-        // Default case for other refs
-        return { current: initialValue };
+        // Fallback for any other refs or if initialValue is not null
+        return actualUseRef(initialValue);
     });
 
-
-    Object.defineProperty(document, 'fullscreenElement', {
-      configurable: true,
-      get: vi.fn(() => null),
-      set: vi.fn(),
-    });
+    // Mock document fullscreen properties and methods
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: vi.fn(() => null) });
     Object.defineProperty(document, 'webkitFullscreenElement', { configurable: true, get: vi.fn(() => null) });
     Object.defineProperty(document, 'mozFullScreenElement', { configurable: true, get: vi.fn(() => null) });
     Object.defineProperty(document, 'msFullscreenElement', { configurable: true, get: vi.fn(() => null) });
-
 
     document.exitFullscreen = vi.fn(() => Promise.resolve());
     (document as any).webkitExitFullscreen = vi.fn(() => Promise.resolve());
@@ -164,7 +188,7 @@ describe('VideoPlayerComponent', () => {
   afterEach(() => {
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
-    vi.restoreAllMocks();
+    vi.restoreAllMocks(); // This will restore React.useRef
   });
 
   it('renders video element with correct src, poster, ensures native controls are off, and has playsInline', () => {
@@ -174,7 +198,7 @@ describe('VideoPlayerComponent', () => {
     expect(videoElement).toHaveAttribute('src', mockMovie.videoUrl);
     expect(videoElement).toHaveAttribute('poster', mockMovie.posterUrl);
     expect(mockVideoElement.controls).toBe(false); 
-    expect(mockVideoElement.playsInline).toBe(true); // Check for playsInline
+    expect(mockVideoElement.playsInline).toBe(true); 
   });
   
   it('attempts to play video on mount', async () => {
@@ -189,25 +213,25 @@ describe('VideoPlayerComponent', () => {
     it('shows control bar on mount (UI is initially visible)', () => {
       render(<VideoPlayerComponent movie={mockMovie} />);
       expect(screen.getByLabelText('Video progress')).toBeInTheDocument();
-      expect(screen.getByLabelText('Play')).toBeInTheDocument(); // Initial state is paused, so "Play"
+      expect(screen.getByLabelText('Play')).toBeInTheDocument(); 
     });
 
     it('toggles play/pause via control bar button', async () => {
       const user = userEvent.setup();
       render(<VideoPlayerComponent movie={mockMovie} />);
       
-      const playButton = screen.getByLabelText('Play'); // Initially Play
+      const playButton = screen.getByLabelText('Play'); 
       await user.click(playButton);
       await waitFor(() => {
-        expect(mockVideoElement.play).toHaveBeenCalledTimes(1); // Initial call + 1 click
-        expect(screen.getByLabelText('Pause')).toBeInTheDocument(); // Should change to Pause
+        expect(mockVideoElement.play).toHaveBeenCalledTimes(2); // Initial auto-play + 1 click
+        expect(screen.getByLabelText('Pause')).toBeInTheDocument(); 
       });
 
       const pauseButton = screen.getByLabelText('Pause');
       await user.click(pauseButton);
       await waitFor(() => {
         expect(mockVideoElement.pause).toHaveBeenCalledTimes(1);
-        expect(screen.getByLabelText('Play')).toBeInTheDocument(); // Should change back to Play
+        expect(screen.getByLabelText('Play')).toBeInTheDocument(); 
       });
     });
 
@@ -215,9 +239,9 @@ describe('VideoPlayerComponent', () => {
       render(<VideoPlayerComponent movie={mockMovie} />);
       
       act(() => {
-        mockVideoElement._currentTime = 30; // 30 seconds
-        mockVideoElement._duration = 600; // 10 minutes
-        mockVideoElement.dispatchEvent(new Event('loadedmetadata'));
+        mockVideoElement._currentTime = 30; 
+        mockVideoElement._duration = 600; 
+        mockVideoElement.dispatchEvent(new Event('loadedmetadata')); // Ensure duration is set
         mockVideoElement.dispatchEvent(new Event('timeupdate'));
       });
 
@@ -230,11 +254,15 @@ describe('VideoPlayerComponent', () => {
 
     it('seeks video when progress bar is changed', async () => {
        render(<VideoPlayerComponent movie={mockMovie} />);
+       act(() => { // Ensure duration is set for the slider to be functional
+         mockVideoElement._duration = 600;
+         mockVideoElement.dispatchEvent(new Event('loadedmetadata'));
+       });
        const progressBar = screen.getByLabelText('Video progress');
        fireEvent.change(progressBar, { target: { value: '120' } }); 
        
       await waitFor(() => {
-        expect(mockVideoElement._currentTime).toBe(120);
+        expect(mockVideoElement.currentTime).toBe(120);
       });
     });
 
@@ -246,13 +274,13 @@ describe('VideoPlayerComponent', () => {
       
       await user.click(muteButton);
       await waitFor(() => {
-        expect(mockVideoElement._muted).toBe(true);
+        expect(mockVideoElement.muted).toBe(true);
         expect(screen.getByLabelText('Unmute')).toBeInTheDocument(); 
       });
 
       await user.click(screen.getByLabelText('Unmute'));
       await waitFor(() => {
-        expect(mockVideoElement._muted).toBe(false);
+        expect(mockVideoElement.muted).toBe(false);
         expect(screen.getByLabelText('Mute')).toBeInTheDocument();
       });
     });
@@ -263,8 +291,8 @@ describe('VideoPlayerComponent', () => {
       fireEvent.change(volumeSlider, { target: { value: '0.5' } });
 
       await waitFor(() => {
-        expect(mockVideoElement._volume).toBe(0.5);
-        expect(mockVideoElement._muted).toBe(false); 
+        expect(mockVideoElement.volume).toBe(0.5);
+        expect(mockVideoElement.muted).toBe(false); 
       });
     });
 
@@ -279,16 +307,16 @@ describe('VideoPlayerComponent', () => {
       await user.click(speedOption);
 
       await waitFor(() => {
-        expect(mockVideoElement._playbackRate).toBe(1.5);
+        expect(mockVideoElement.playbackRate).toBe(1.5);
         expect(screen.getByLabelText('Playback speed 1.5x')).toBeInTheDocument(); 
       });
     });
 
-    it('toggles fullscreen via fullscreen button and ensures native controls remain off', async () => {
+    it('toggles fullscreen via fullscreen button (on desktop) and ensures native controls remain off', async () => {
       (useIsMobile as vi.Mock).mockReturnValue(false); // Desktop
       const user = userEvent.setup();
       render(<VideoPlayerComponent movie={mockMovie} />);
-      expect(mockVideoElement.controls).toBe(false); // Initial check
+      expect(mockVideoElement.controls).toBe(false); 
       
       const enterFullscreenButton = screen.getByLabelText('Enter fullscreen');
       expect(enterFullscreenButton).toBeInTheDocument();
@@ -303,12 +331,12 @@ describe('VideoPlayerComponent', () => {
         if (window.screen?.orientation?.lock) {
             expect(window.screen.orientation.lock).toHaveBeenCalledWith('landscape');
         }
-        expect(mockVideoElement.controls).toBe(false); // Check after trying to enter fullscreen
+        expect(mockVideoElement.controls).toBe(false); 
       });
 
       Object.defineProperty(document, 'fullscreenElement', { get: () => mockPlayerContainerElement as HTMLElement, configurable: true });
       act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
-      expect(mockVideoElement.controls).toBe(false); // Check after fullscreenchange event
+      expect(mockVideoElement.controls).toBe(false); 
       
       const exitFullscreenButton = await screen.findByLabelText('Exit fullscreen');
       expect(exitFullscreenButton).toBeInTheDocument();
@@ -323,11 +351,11 @@ describe('VideoPlayerComponent', () => {
         if (window.screen?.orientation?.unlock) {
             expect(window.screen.orientation.unlock).toHaveBeenCalled();
         }
-        expect(mockVideoElement.controls).toBe(false); // Check after trying to exit fullscreen
+        expect(mockVideoElement.controls).toBe(false); 
       });
        Object.defineProperty(document, 'fullscreenElement', { get: () => null, configurable: true });
        act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
-       expect(mockVideoElement.controls).toBe(false); // Check after fullscreenchange event (exit)
+       expect(mockVideoElement.controls).toBe(false); 
        expect(await screen.findByLabelText('Enter fullscreen')).toBeInTheDocument();
     });
 
@@ -347,17 +375,17 @@ describe('VideoPlayerComponent', () => {
         
         fireEvent.mouseMove(playerContainer);
         await waitFor(() => {
-            expect(screen.getByLabelText('Video progress')).toBeVisible();
+            expect(screen.getByLabelText('Video progress').closest('div[data-testid="video-controls-bar"]')).toHaveStyle('opacity: 1');
         });
-
-        act(() => { vi.advanceTimersByTime(3000); });
+        
+        act(() => { vi.advanceTimersByTime(3000); }); // Default timeout is 3s
         await waitFor(() => {
-             expect(screen.getByLabelText('Video progress').closest('div[style*="opacity: 0"]')).toBeTruthy();
+            expect(screen.getByLabelText('Video progress').closest('div[data-testid="video-controls-bar"]')).toHaveStyle('opacity: 0');
         });
 
         fireEvent.mouseMove(playerContainer);
         await waitFor(() => {
-           expect(screen.getByLabelText('Video progress').closest('div[style*="opacity: 1"]')).toBeTruthy();
+           expect(screen.getByLabelText('Video progress').closest('div[data-testid="video-controls-bar"]')).toHaveStyle('opacity: 1');
         });
     });
 
@@ -370,13 +398,13 @@ describe('VideoPlayerComponent', () => {
       
       fireEvent.mouseMove(playerContainer); 
       await waitFor(() => {
-         expect(screen.getByLabelText('Video progress').closest('div[style*="opacity: 1"]')).toBeTruthy();
+         expect(screen.getByLabelText('Video progress').closest('div[data-testid="video-controls-bar"]')).toHaveStyle('opacity: 1');
       });
 
       act(() => { vi.advanceTimersByTime(4000); }); 
       
       await waitFor(() => { 
-         expect(screen.getByLabelText('Video progress').closest('div[style*="opacity: 1"]')).toBeTruthy();
+         expect(screen.getByLabelText('Video progress').closest('div[data-testid="video-controls-bar"]')).toHaveStyle('opacity: 1');
       });
     });
   });
@@ -419,24 +447,25 @@ describe('VideoPlayerComponent', () => {
       mockVideoElement._paused = false; 
       act(() => mockVideoElement.dispatchEvent(new Event('play')));
       await waitFor(() => expect(mockVideoElement._paused).toBe(false));
-       // Simulate UI hide
-      act(() => { vi.advanceTimersByTime(3000); });
+      
+      // Simulate UI hide
+      act(() => { vi.advanceTimersByTime(3000); }); // Match player's timeout
       await waitFor(() => {
-          expect(screen.getByLabelText('Video progress').closest('div[style*="opacity: 0"]')).toBeTruthy();
+          expect(screen.getByLabelText('Video progress').closest('div[data-testid="video-controls-bar"]')).toHaveStyle('opacity: 0');
       });
 
       await user.click(playerArea);
       await waitFor(() => {
         expect(mockVideoElement.pause).toHaveBeenCalledTimes(1);
         expect(mockVideoElement._paused).toBe(true);
-        expect(screen.getByLabelText('Video progress').closest('div[style*="opacity: 1"]')).toBeTruthy();
+        expect(screen.getByLabelText('Video progress').closest('div[data-testid="video-controls-bar"]')).toHaveStyle('opacity: 1');
       });
 
       await user.click(playerArea);
       await waitFor(() => {
-        expect(mockVideoElement.play).toHaveBeenCalledTimes(2); // Initial call + 1 click
+        expect(mockVideoElement.play).toHaveBeenCalledTimes(2); // Initial auto-play + 1 click
         expect(mockVideoElement._paused).toBe(false);
-        expect(screen.getByLabelText('Video progress').closest('div[style*="opacity: 1"]')).toBeTruthy();
+        expect(screen.getByLabelText('Video progress').closest('div[data-testid="video-controls-bar"]')).toHaveStyle('opacity: 1');
       });
     });
 
@@ -453,7 +482,7 @@ describe('VideoPlayerComponent', () => {
                                  (document as any).webkitExitFullscreen ||
                                  (document as any).mozCancelFullScreen ||
                                  (document as any).msExitFullscreen;
-      expect(mockVideoElement.controls).toBe(false); // Initial check
+      expect(mockVideoElement.controls).toBe(false); 
       
       // --- First click: Enter Fullscreen ---
       await user.click(playerArea);
@@ -462,17 +491,16 @@ describe('VideoPlayerComponent', () => {
         if (window.screen?.orientation?.lock) {
             expect(window.screen.orientation.lock).toHaveBeenCalledWith('landscape');
         }
-        // Play is not called on mobile player click, only fullscreen
-        expect(mockVideoElement.play).toHaveBeenCalledTimes(1); // Initial auto-play attempt
+        expect(mockVideoElement.play).toHaveBeenCalledTimes(1); // Only initial auto-play
         expect(mockVideoElement.pause).not.toHaveBeenCalled();
         expect(mockVideoElement.controls).toBe(false);
-        expect(screen.getByLabelText('Video progress').closest('div[style*="opacity: 1"]')).toBeTruthy();
+        expect(screen.getByLabelText('Video progress').closest('div[data-testid="video-controls-bar"]')).toHaveStyle('opacity: 1');
       });
 
       // --- Simulate being in fullscreen ---
       Object.defineProperty(document, 'fullscreenElement', { get: () => mockPlayerContainerElement as HTMLElement, configurable: true });
       act(() => { document.dispatchEvent(new Event('fullscreenchange')); }); 
-      expect(mockVideoElement.controls).toBe(false); // Check after event
+      expect(mockVideoElement.controls).toBe(false); 
 
       // --- Second click: Exit Fullscreen ---
       await user.click(playerArea);
@@ -482,12 +510,12 @@ describe('VideoPlayerComponent', () => {
             expect(window.screen.orientation.unlock).toHaveBeenCalled();
         }
         expect(mockVideoElement.controls).toBe(false);
-        expect(screen.getByLabelText('Video progress').closest('div[style*="opacity: 1"]')).toBeTruthy();
+        expect(screen.getByLabelText('Video progress').closest('div[data-testid="video-controls-bar"]')).toHaveStyle('opacity: 1');
       });
 
       Object.defineProperty(document, 'fullscreenElement', { get: () => null, configurable: true });
       act(() => { document.dispatchEvent(new Event('fullscreenchange')); }); 
-      expect(mockVideoElement.controls).toBe(false); // Check after event
+      expect(mockVideoElement.controls).toBe(false); 
     });
   });
 
@@ -496,23 +524,34 @@ describe('VideoPlayerComponent', () => {
     const user = userEvent.setup();
     render(<VideoPlayerComponent movie={mockMovie} />);
     
+    // Ensure video is initially considered paused for this test logic
     mockVideoElement._paused = true; 
-    act(() => mockVideoElement.dispatchEvent(new Event('pause')));
+    act(() => mockVideoElement.dispatchEvent(new Event('pause'))); // Dispatch pause to set internal state
 
     const playButtonInControls = screen.getByLabelText('Play');
 
+    // Click the play button in the controls
     await user.click(playButtonInControls);
     await waitFor(() => {
+      // play() in controls should be called.
+      // mockVideoElement.play was called once on mount, then once by clicking the control button.
       expect(mockVideoElement.play).toHaveBeenCalledTimes(2); 
+      // pause() should not have been called by clicking the play button in controls
       expect(mockVideoElement.pause).not.toHaveBeenCalled(); 
     });
 
+    // Test for mobile
+    vi.clearAllMocks(); // Clear mocks for the next part
     (useIsMobile as vi.Mock).mockReturnValue(true);
-    vi.clearAllMocks(); 
+    
+    // Re-initialize mockVideoElement for the mobile part of the test
+    mockVideoElement._paused = true; // Reset paused state
+    mockVideoElement.play = vi.fn(() => { /* as before */ return Promise.resolve(); }); // Reset play mock
+    mockVideoElement.pause = vi.fn(); // Reset pause mock
+
     const { rerender } = render(<VideoPlayerComponent movie={mockMovie} />);
-    // We need to re-initialize the React component with new props/state
-    // Forcing a re-render helps ensure the isMobile state is correctly picked up.
-    rerender(<VideoPlayerComponent movie={mockMovie} />); 
+    rerender(<VideoPlayerComponent movie={mockMovie} />); // Force re-render with mobile state
+    act(() => mockVideoElement.dispatchEvent(new Event('pause'))); // Dispatch pause
 
 
     const requestFullscreenMock = mockPlayerContainerElement.requestFullscreen ||
@@ -523,9 +562,12 @@ describe('VideoPlayerComponent', () => {
     const playButtonInControlsMobile = screen.getByLabelText('Play'); 
     await user.click(playButtonInControlsMobile); 
      await waitFor(() => {
+      // Clicking play button in controls should not trigger fullscreen
       expect(requestFullscreenMock).not.toHaveBeenCalled();
+      // It should call play on the video element
+      expect(mockVideoElement.play).toHaveBeenCalledTimes(1); // Only from control click in this mobile segment
     });
-
   });
 });
 
+    

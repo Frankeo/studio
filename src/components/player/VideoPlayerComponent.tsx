@@ -425,9 +425,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           max={duration || 1} 
           step={0.1}
           onValueChange={(value) => handleSeek(value[0])}
-          className="w-full mb-1 md:mb-2 group 
-                     [&>span:first-child]:h-1 [&>span:first-child>span]:h-1 
-                     [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2 [&>span:last-child]:translate-y-px"
+          className="w-full mb-1 md:mb-2 group [&>span:first-child]:h-1 [&>span:first-child>span]:h-1"
           aria-label="Video progress"
         />
         <div className="flex items-center justify-between text-white">
@@ -445,8 +443,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
                 max={1}
                 step={0.01}
                 onValueChange={(value) => handleVolumeSliderChange(value[0])}
-                className="[&>span:first-child]:h-1 [&>span:first-child>span]:h-1 
-                           [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2 [&>span:last-child]:translate-y-px"
+                className="[&>span:first-child]:h-1 [&>span:first-child>span]:h-1"
                 aria-label="Volume"
               />
             </div>
@@ -480,4 +477,5 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     </div>
   );
 }
+
 

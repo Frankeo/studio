@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Play, Pause, Maximize, Minimize, VolumeX, Volume1, Volume2, Gauge, Check } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile'; // Import useIsMobile
 
 interface VideoPlayerProps {
   movie: Movie;
@@ -39,6 +40,8 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+
+  const isMobile = useIsMobile(); // Get mobile state
 
   const clearUiTimeout = useCallback(() => {
     if (uiTimeoutRef.current) {
@@ -142,19 +145,6 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     }
   };
   
-  const handlePlayerClick = (e: React.MouseEvent) => {
-     // Only toggle play/pause if the click is not on an interactive control element
-    if ((e.target as HTMLElement).closest('button, [role="slider"], [role="menuitem"]')) {
-      return;
-    }
-    togglePlayPause();
-  };
-
-  const handleResumePlay = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    videoRef.current?.play();
-  };
-
   const toggleFullscreen = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!playerContainerRef.current) return;
@@ -204,6 +194,23 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       console.error("Fullscreen API error:", error);
       // Potentially update UI or show a toast if fullscreen fails
     }
+  };
+
+  const handlePlayerClick = (e: React.MouseEvent) => {
+     // Only toggle play/pause if the click is not on an interactive control element
+    if ((e.target as HTMLElement).closest('button, [role="slider"], [role="menuitem"]')) {
+      return;
+    }
+    if (isMobile) {
+      toggleFullscreen(); // On mobile, tap player to toggle fullscreen/landscape
+    } else {
+      togglePlayPause(); // On desktop, tap player to toggle play/pause
+    }
+  };
+
+  const handleResumePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    videoRef.current?.play();
   };
 
   const handleSeek = (value: number) => {
@@ -350,7 +357,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
                   value={[isMuted ? 0 : volume]}
                   max={1}
                   step={0.01}
-                  onValueChange={handleVolumeSliderChange}
+                  onValueChange={(value) => handleVolumeSliderChange(value[0])}
                   className="[&>span:first-child]:h-1 [&>span:first-child>span]:h-1 [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:-top-0.5 group [&>span:last-child]:border-2 group-hover:[&>span:last-child]:scale-125"
                   aria-label="Volume"
                 />

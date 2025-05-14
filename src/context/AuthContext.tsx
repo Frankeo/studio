@@ -12,7 +12,7 @@ import {
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '@/lib/firebase/config';
 import { mockUser, MOCK_USER_CREDENTIALS } from '@/lib/mockData';
-import { Loader2 } from 'lucide-react';
+import GlobalLoader from '@/components/layout/GlobalLoader';
 import type { AuthContextType } from './interfaces';
 
 const AuthContext = createContext<AuthContextType>({ 
@@ -107,12 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // This also covers the brief period where isFirebaseConfigured might be true
   // but onAuthStateChanged hasn't fired yet.
   if (loading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <span className="sr-only">Loading application...</span>
-      </div>
-    );
+    return <GlobalLoader />;
   }
 
   return (

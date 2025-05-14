@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2 } from 'lucide-react';
+import GlobalLoader from '@/components/layout/GlobalLoader';
 
 export default function HomePage() {
   const { user, loading } = useAuth();
@@ -19,10 +20,5 @@ export default function HomePage() {
     }
   }, [user, loading, router]);
 
-  return (
-    <div className="flex h-screen w-screen items-center justify-center bg-background">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      <span className="sr-only">Loading StreamVerse...</span>
-    </div>
-  );
+  return <GlobalLoader />;
 }

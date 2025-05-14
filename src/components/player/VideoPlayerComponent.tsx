@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Play, Pause, Maximize, Minimize, VolumeX, Volume1, Volume2, Gauge, Check } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import type { ScreenMobile, VideoElementWithFullscreen, VideoPlayerProps } from './interfaces'; // Added type import
+import type { ScreenMobile, VideoElementWithFullscreen, VideoPlayerProps } from './interfaces';
 
 const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
@@ -23,7 +23,7 @@ const formatTime = (timeInSeconds: number): string => {
 };
 
 export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<VideoElementWithFullscreen>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -84,13 +84,9 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     setPlaybackRate(video.playbackRate);
     setIsPaused(video.paused);
 
-    // Attempt to autoplay, handle failure by setting paused state
-    video.play().then(() => {
-      // Autoplay started or play was successful
-    }).catch(() => {
-      // Autoplay was prevented or play failed
-      setIsPaused(true); // Ensure UI reflects paused state
-      setShowPlayerUI(true); // Show controls if autoplay fails
+    video.play().catch(() => {
+      setIsPaused(true);
+      setShowPlayerUI(true);
     });
 
 
@@ -110,25 +106,37 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     const video = videoRef.current;
 
     const handleFullscreenChange = () => {
-      const doc = document as Document & { webkitFullscreenElement?: Element; mozFullScreenElement?: Element; msFullscreenElement?: Element; };
-      const isCurrentlyFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+      const doc = document as Document & { webkitFullscreenElement?: Element; mozFullScreenElement?: Element; msFullscreenElement?: Element; webkitIsFullScreen?: boolean; mozFullScreen?: boolean; };
+      const isCurrentlyFullscreen = !!(
+        doc.fullscreenElement ||
+        doc.webkitFullscreenElement ||
+        doc.mozFullScreenElement ||
+        doc.msFullscreenElement ||
+        (video && video.webkitSupportsFullscreen && video.webkitDisplayingFullscreen) // iOS specific for video element
+      );
       setIsFullscreen(isCurrentlyFullscreen);
       if (video) {
-        video.controls = false; // Re-assert no native controls
+        video.controls = false;
       }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange); // For Safari/Webkit
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    // Specific to video element fullscreen on iOS
+    if (video) {
+        video.addEventListener('webkitbeginfullscreen', () => setIsFullscreen(true));
+        video.addEventListener('webkitendfullscreen', () => setIsFullscreen(false));
+    }
+
 
     if (video) {
         const doc = document as Document & { webkitFullscreenElement?: Element; mozFullScreenElement?: Element; msFullscreenElement?: Element; };
-        const isCurrentlyFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+        const isCurrentlyFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement || (video.webkitSupportsFullscreen && video.webkitDisplayingFullscreen) );
         if (isCurrentlyFullscreen) {
             setIsFullscreen(true);
         }
-        video.controls = false; // Ensure no native controls initially
+        video.controls = false;
     }
 
     return () => {
@@ -136,6 +144,10 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+      if (video) {
+        video.removeEventListener('webkitbeginfullscreen', () => setIsFullscreen(true));
+        video.removeEventListener('webkitendfullscreen', () => setIsFullscreen(false));
+      }
     };
   }, []);
 
@@ -147,7 +159,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   }, [startUiHideTimer]);
 
   const togglePlayPause = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation(); // Prevent click from bubbling to playerContainerRef
+    if (e) e.stopPropagation();
     const video = videoRef.current;
     if (!video) return;
     video.controls = false;
@@ -160,22 +172,34 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
   const toggleFullscreen = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!playerContainerRef.current) return;
+    const video = videoRef.current;
+    const playerElement = playerContainerRef.current as VideoElementWithFullscreen | null; // Can be null
 
-    const playerElement = playerContainerRef.current as unknown as VideoElementWithFullscreen;
-    const video = videoRef.current as VideoElementWithFullscreen | null;
-    if (video) video.controls = false;
+    if (!video && !playerElement) return;
+
+    const doc = document as Document & {
+        webkitExitFullscreen?: () => Promise<void>;
+        mozCancelFullScreen?: () => Promise<void>;
+        msExitFullscreen?: () => Promise<void>;
+        webkitIsFullScreen?: boolean;
+        mozFullScreen?: boolean;
+    };
 
     try {
       if (!isFullscreen) {
-        if (playerElement.requestFullscreen) {
-          await playerElement.requestFullscreen();
-        } else if (playerElement.webkitRequestFullscreen) {
-          await playerElement.webkitRequestFullscreen();
-        } else if (playerElement.mozRequestFullScreen) {
-          await playerElement.mozRequestFullScreen();
-        } else if (playerElement.msRequestFullscreen) {
-          await playerElement.msRequestFullscreen();
+        // Try iOS-specific video element fullscreen first
+        if (video && typeof video.webkitEnterFullscreen === 'function') {
+          video.webkitEnterFullscreen();
+        } else if (playerElement) { // Fallback to container fullscreen for other platforms
+          if (playerElement.requestFullscreen) {
+            await playerElement.requestFullscreen();
+          } else if (playerElement.webkitRequestFullscreen) {
+            await playerElement.webkitRequestFullscreen();
+          } else if (playerElement.mozRequestFullScreen) {
+            await playerElement.mozRequestFullScreen();
+          } else if (playerElement.msRequestFullscreen) {
+            await playerElement.msRequestFullscreen();
+          }
         }
 
         if (typeof window !== 'undefined' && window.screen && window.screen.orientation && typeof (window.screen.orientation as ScreenMobile).lock === 'function') {
@@ -186,8 +210,10 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           }
         }
       } else {
-        const doc = document as Document & { webkitExitFullscreen?: () => Promise<void>; mozCancelFullScreen?: () => Promise<void>; msExitFullscreen?: () => Promise<void>; };
-        if (doc.exitFullscreen) {
+        // Try iOS-specific video element exit fullscreen first
+        if (video && typeof video.webkitExitFullscreen === 'function') {
+          video.webkitExitFullscreen();
+        } else if (doc.exitFullscreen) { // Standard exit
           await doc.exitFullscreen();
         } else if (doc.webkitExitFullscreen) {
           await doc.webkitExitFullscreen();
@@ -213,7 +239,6 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
  const handlePlayerClick = (e: React.MouseEvent) => {
     const targetElement = e.target as HTMLElement;
-    // Prevent player click if it originated from a button, slider, menu item, or the controls bar itself.
     if (targetElement.closest('button, [role="slider"], [role="menuitem"], [data-testid="video-controls-bar"], .group')) {
       return;
     }
@@ -222,10 +247,10 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     if (!video) return;
 
     video.controls = false;
-    setShowPlayerUI(true); // Always show UI on a valid screen tap
+    setShowPlayerUI(true);
 
     if (video.paused || video.ended) {
-      video.play(); 
+      video.play();
     } else {
       video.pause();
     }
@@ -233,7 +258,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
 
   const handleResumePlay = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent this click from bubbling to handlePlayerClick
+    e.stopPropagation();
     const video = videoRef.current;
     if(video) {
       video.controls = false;
@@ -270,7 +295,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       videoRef.current.muted = !videoRef.current.muted;
       setIsMuted(videoRef.current.muted);
       if (!videoRef.current.muted && videoRef.current.volume === 0) {
-        videoRef.current.volume = 0.5; // Restore to a default volume if unmuting from 0
+        videoRef.current.volume = 0.5;
         setVolume(0.5);
       }
     }
@@ -308,18 +333,17 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         poster={movie.posterUrl || `https://placehold.co/1280x720.png`}
         aria-label={`Video player for ${movie.title}`}
         data-ai-hint="movie video"
-        playsInline // Essential for custom controls on iOS
-        webkit-playsinline="true" // Older WebKit prefix for iOS, true as string for HTML attribute
-        onClick={(e) => e.stopPropagation()} // Prevent video element's default click handling if any
+        playsInline 
+        webkit-playsinline="true" 
+        onClick={(e) => e.stopPropagation()} 
       >
         Your browser does not support the video tag.
       </video>
 
-      {/* Pause Overlay: Shown when video is paused and UI is active */}
       {isPaused && showPlayerUI && (
         <div
           className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-20"
-          onClick={(e) => e.stopPropagation()} // Prevent clicks on overlay from bubbling to handlePlayerClick
+          onClick={(e) => e.stopPropagation()} 
         >
           <div className="absolute top-0 left-0 p-4 md:p-6 max-w-sm text-white">
             <h1 className="text-2xl md:text-3xl font-bold mb-2 line-clamp-2 shadow-text">{movie.title}</h1>
@@ -334,7 +358,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
             </p>
           </div>
           <Button
-            onClick={handleResumePlay} // Uses specific resume handler
+            onClick={handleResumePlay} 
             className="bg-primary/80 hover:bg-primary text-primary-foreground p-0 w-20 h-20 md:w-28 md:h-28 rounded-full shadow-xl transform transition-all hover:scale-110 focus:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-black/50"
             aria-label={`Resume playing ${movie.title}`}
           >
@@ -343,7 +367,6 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         </div>
       )}
 
-      {/* Hover/Active Info Overlay: Shown when video is playing and UI is active */}
       {!isPaused && showPlayerUI && (
         <div
           className="absolute top-0 left-0 h-full w-full max-w-xs sm:max-w-sm md:max-w-md bg-gradient-to-r from-black/70 via-black/50 to-transparent p-4 md:p-6 flex flex-col justify-start text-white transition-opacity duration-300 ease-in-out pointer-events-none z-10"
@@ -363,17 +386,15 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         </div>
       )}
 
-      {/* Controls Bar */}
       <div
         data-testid="video-controls-bar"
         className="absolute bottom-0 left-0 right-0 px-2 pb-1 pt-1 md:px-4 md:pb-2 md:pt-2 bg-gradient-to-t from-black/80 via-black/50 to-transparent z-30 transition-opacity duration-300 ease-in-out"
         style={{ opacity: showPlayerUI ? 1 : 0 }}
-        onClick={(e) => e.stopPropagation()} // Prevent clicks on controls bar from bubbling
+        onClick={(e) => e.stopPropagation()} 
       >
-        {/* Progress Slider */}
         <Slider
           value={[currentTime]}
-          max={duration || 1} // Use 1 as default max if duration is 0 to prevent errors
+          max={duration || 1} 
           step={0.1}
           onValueChange={(value) => handleSeek(value[0])}
           className="w-full h-2 mb-1 md:mb-2 group 
@@ -382,7 +403,6 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           aria-label="Video progress"
         />
         <div className="flex items-center justify-between text-white">
-          {/* Left Controls: Play/Pause, Mute, Volume, Time */}
           <div className="flex items-center gap-1 md:gap-2">
             <Button variant="ghost" size="icon" onClick={togglePlayPause} aria-label={isPaused ? "Play" : "Pause"}>
               {isPaused ? <Play className="h-5 w-5 md:h-6 md:w-6" fill="currentColor" /> : <Pause className="h-5 w-5 md:h-6 md:w-6" fill="currentColor"/>}
@@ -406,7 +426,6 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
           </div>
-          {/* Right Controls: Speed, Fullscreen */}
           <div className="flex items-center gap-0.5 md:gap-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -424,7 +443,6 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            {/* Fullscreen button always visible */}
             <Button variant="ghost" size="icon" onClick={toggleFullscreen} aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
               {isFullscreen ? <Minimize className="h-5 w-5 md:h-6 md:w-6" /> : <Maximize className="h-5 w-5 md:h-6 md:w-6" />}
             </Button>
@@ -434,4 +452,3 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     </div>
   );
 }
-

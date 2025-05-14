@@ -1,12 +1,13 @@
-import { Movie } from "@/types/movie";
+
+import type { Movie } from "@/types/movie";
 
 export interface VideoElementWithFullscreen extends HTMLVideoElement {
   webkitRequestFullscreen?: () => Promise<void>;
   mozRequestFullScreen?: () => Promise<void>;
   msRequestFullscreen?: () => Promise<void>;
-  webkitExitFullscreen?: () => Promise<void>;
-  mozCancelFullScreen?: () => Promise<void>;
-  msExitFullscreen?: () => Promise<void>;
+  webkitEnterFullscreen?: () => void; // Added for iOS Safari
+  webkitExitFullscreen?: () => void;  // Added for iOS Safari
+  webkitSupportsFullscreen?: boolean; // For checking support
 }
 
 export interface VideoPlayerProps {
@@ -14,10 +15,11 @@ export interface VideoPlayerProps {
 }
 
 export interface ScreenMobile {
-  lock?: (orientation: OrientationType) => Promise<void>; 
+  lock?: (orientation: OrientationType) => Promise<void>;
   unlock?: () => void;
+  type?: OrientationType; // Added type property
 }
 
-export interface MockVideoElement{ 
-  _playsInline?: boolean 
+export interface MockVideoElement{
+  _playsInline?: boolean
 }

@@ -44,10 +44,10 @@ export default function LoginForm() {
       await signInWithEmail(data.email, data.password);
       toast({ title: 'Login Successful', description: 'Welcome back!' });
       router.push('/catalog');
-    } catch (error: any) {
-      toast({
+    } catch (error) {
+      toast({ // Use a more specific type if possible, e.g., from a custom error type or a library
         title: 'Login Failed',
-        description: error.message || 'An unexpected error occurred.',
+        description: (error as Error).message || 'An unexpected error occurred.',
         variant: 'destructive',
       });
     } finally {
@@ -61,10 +61,10 @@ export default function LoginForm() {
       await signInWithGoogle();
       toast({ title: 'Login Successful', description: 'Welcome!' });
       router.push('/catalog');
-    } catch (error: any) {
+    } catch (error) { // Use a more specific type if possible
        toast({
         title: 'Google Sign-In Failed',
-        description: error.message || 'Could not sign in with Google.',
+        description: (error as Error).message || 'Could not sign in with Google.',
         variant: 'destructive',
       });
     } finally {

@@ -1,6 +1,7 @@
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useAuth } from '@/context/AuthContext'; // Use ES Module import
 import LoginForm from './LoginForm';
 import type { AuthContextType } from '@/context/interfaces'; // Import the type
 
@@ -31,16 +32,14 @@ const mockSignInWithGoogle = vi.fn();
 
 // Define a type for the mock useAuth return value
 type MockUseAuth = Partial<AuthContextType>;
-
-
-const mockUseAuth = (override: MockUseAuth = {}) => ({
+const mockUseAuth = (override: MockUseAuth = {}): AuthContextType => ({
   user: null,
   loading: false,
   signInWithEmail: mockSignInWithEmail,
   signInWithGoogle: mockSignInWithGoogle,
   signOut: vi.fn(),
   ...override,
-});
+}) as AuthContextType; // Cast to AuthContextType
 
 vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn().mockImplementation(() => mockUseAuth()),
@@ -50,8 +49,8 @@ vi.mock('@/context/AuthContext', () => ({
 describe('LoginForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset to default mock implementation before each test
-    (require('@/context/AuthContext').useAuth as any).mockImplementation(() => mockUseAuth());
+    // Reset to default mock implementation before each test using the imported hook
+    (useAuth as vi.Mock).mockImplementation(() => mockUseAuth());
   });
 
   it('renders the login form correctly', () => {
@@ -159,7 +158,7 @@ describe('LoginForm', () => {
   });
 
   it('disables buttons when isLoading', async () => {
-     (require('@/context/AuthContext').useAuth as any).mockImplementation(() => mockUseAuth());
+     (useAuth as vi.Mock).mockImplementation(() => mockUseAuth());
     const { rerender } = render(<LoginForm />);
 
     // Simulate loading state for email sign-in
@@ -176,7 +175,7 @@ describe('LoginForm', () => {
 
     // Reset mocks and component state for next part of test
     vi.clearAllMocks();
-    (require('@/context/AuthContext').useAuth as any).mockImplementation(() => mockUseAuth()); // Reset to non-loading
+    (useAuth as vi.Mock).mockImplementation(() => mockUseAuth()); // Reset to non-loading
     rerender(<LoginForm />);
 
 

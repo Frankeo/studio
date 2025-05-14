@@ -7,13 +7,13 @@ import { MOCK_VIDEO_URL } from '@/lib/mockData';
 import { useIsMobile } from '@/hooks/use-mobile';
 import React from 'react'; // Import React for useRef mocking
 import { Mock } from 'vitest';
-import { ScreenMobile } from './interfaces';
+import { MockVideoElement, ScreenMobile } from './interfaces';
 
 let mockVideoElement: Partial<HTMLVideoElement> & {
   _listeners: Record<string, Function[]>;
   _paused: boolean;
-  _currentTime: number;
-  _duration: number;
+ _currentTime: number;
+  _duration: number | undefined; // Duration can be undefined before metadata is loaded
   _volume: number;
   _muted: boolean;
   _playbackRate: number;
@@ -50,7 +50,6 @@ const mockMovie: Movie = {
 // Mock the useRef hook to return our mock elements
 const actualUseRef = React.useRef; // Store original React.useRef
 let refCallCount = 0;
-let playMock: Mock;
 
 vi.spyOn(React, 'useRef').mockImplementation((initialValue) => {
     const currentCall = ++refCallCount;
@@ -80,27 +79,27 @@ describe('VideoPlayerComponent', () => {
     mockVideoElement = {
       _listeners: {},
       _paused: true,
-      _currentTime: 0,
-      _duration: 600, 
-    _volume: 1, // Start with volume 1
+      _currentTime: 0,      _duration: undefined, // Start with duration undefined
+      _volume: 1, // Start with volume 1
       _muted: false,
+
       _playbackRate: 1,
       _controls: false,
       playsInline: false,
 
       // Define playMock here
-      play: playMock = vi.fn(() => Promise.resolve().then(() => {
+      play: vi.fn(() => Promise.resolve().then(() => {
  act(() => mockVideoElement.dispatchEvent(new Event('play')));
         act(() => mockVideoElement.dispatchEvent(new Event('playing')));
       })),      pause: vi.fn(() => {
         mockVideoElement._paused = true;
         act(() => mockVideoElement.dispatchEvent(new Event('pause')));
-      }),
-      addEventListener: vi.fn((type, listener) => {
+      }),      addEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
         if (!mockVideoElement._listeners[type]) {
           mockVideoElement._listeners[type] = [];
         }
         mockVideoElement._listeners[type].push(listener as Function);
+
       }),
       removeEventListener: vi.fn((type, listener) => {
         if (mockVideoElement._listeners[type]) {
@@ -146,8 +145,8 @@ describe('VideoPlayerComponent', () => {
       configurable: true 
     });
      Object.defineProperty(mockVideoElement, 'playsInline', { 
-      get: () => (mockVideoElement as any)._playsInline, // Use a backing field to avoid recursion
-      set: (val) => { (mockVideoElement as any)._playsInline = val; },
+ get: () => (mockVideoElement as MockVideoElement)._playsInline, // Use a backing field to avoid recursion
+      set: (val) => { (mockVideoElement as MockVideoElement)._playsInline = val; },
       configurable: true 
     });
     (mockVideoElement as any)._playsInline = false; // Initialize backing field
@@ -167,8 +166,8 @@ describe('VideoPlayerComponent', () => {
     Object.defineProperty(document, 'mozFullScreenElement', { configurable: true, get: vi.fn(() => null) });
     Object.defineProperty(document, 'msFullscreenElement', { configurable: true, get: vi.fn(() => null) });
 
-    document.exitFullscreen = vi.fn(() => Promise.resolve());
-    (document as any).webkitExitFullscreen = vi.fn(() => Promise.resolve());
+ document.exitFullscreen = vi.fn(() => Promise.resolve()) as Mock;
+ (document as any).webkitExitFullscreen = vi.fn(() => Promise.resolve()) as Mock;
     (document as any).mozCancelFullScreen = vi.fn(() => Promise.resolve());
     (document as any).msExitFullscreen = vi.fn(() => Promise.resolve());
 
@@ -480,11 +479,13 @@ describe('VideoPlayerComponent', () => {
                                   mockPlayerContainerElement.webkitRequestFullscreen ||
                                   mockPlayerContainerElement.mozRequestFullScreen ||
                                   mockPlayerContainerElement.msRequestFullscreen;
+      
       const exitFullscreenMock = document.exitFullscreen ||
-                                 (document as any).webkitExitFullscreen ||
-                                 (document as any).mozCancelFullScreen ||
-                                 (document as any).msExitFullscreen;
-      expect(mockVideoElement.controls).toBe(false); 
+        (document as { webkitExitFullscreen?: Mock }).webkitExitFullscreen ||
+        (document as { mozCancelFullScreen?: Mock }).mozCancelFullScreen ||
+        (document as { msExitFullscreen?: Mock }).msExitFullscreen;      
+        
+      expect(mockVideoElement.controls).toBe(false);
       
       // --- First click: Enter Fullscreen ---
       await user.click(playerArea);

@@ -17,3 +17,7 @@ export interface ScreenMobile {
   lock?: (orientation: OrientationType) => Promise<void>; 
   unlock?: () => void;
 }
+
+export interface MockVideoElement{ 
+  _playsInline?: boolean 
+}

@@ -128,8 +128,8 @@ export default function CatalogPage() {
            // If featured movies load attempt is done, ensure its loading state is false
          }
       }
-    }
-  }, [user, authLoading, router, fetchMainMovies, fetchFeaturedMovies]);
+    } // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading, router, fetchMainMovies, fetchFeaturedMovies, featuredMovies.length, hasMore, isFetchingMore, isLoadingFeatured, movies.length]);
 
 
   if (authLoading || (isLoading && movies.length === 0 && hasMore && isLoadingFeatured && featuredMovies.length === 0)) { 

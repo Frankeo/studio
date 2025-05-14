@@ -32,6 +32,7 @@ let mockVideoElement: Partial<HTMLVideoElement> & {
   _muted: boolean;
   _playbackRate: number;
   _controls: boolean;
+  playsInline: boolean; // Added for testing
   dispatchEvent: (event: Event) => boolean;
   addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
   removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
@@ -59,6 +60,7 @@ describe('VideoPlayerComponent', () => {
       _muted: false,
       _playbackRate: 1,
       _controls: false,
+      playsInline: false, // Initialize
 
       play: vi.fn(() => {
         mockVideoElement._paused = false;
@@ -102,7 +104,6 @@ describe('VideoPlayerComponent', () => {
       set playbackRate(val) { mockVideoElement._playbackRate = val; /* dispatch 'ratechange' if needed */ },
       get controls() { return mockVideoElement._controls; },
       set controls(val) { mockVideoElement._controls = val; },
-
     };
     
     mockPlayerContainerElement = {
@@ -114,10 +115,20 @@ describe('VideoPlayerComponent', () => {
 
     vi.spyOn(document, 'getElementById').mockImplementation(() => null); // Default mock
     vi.spyOn(React, 'useRef').mockImplementation((initialValue) => {
-        if (initialValue === null && !initialValue?.tagName?.toLowerCase().includes('video')) { // Simple check for player container
+        // Check if the initialValue has a 'tagName' property and if it includes 'video'.
+        // This is a simplified check. In a real scenario, you might need a more robust way to distinguish.
+        const isVideoElement = typeof initialValue === 'object' && initialValue !== null && 
+                               (initialValue as any).tagName && 
+                               (initialValue as any).tagName.toLowerCase().includes('video');
+    
+        if (isVideoElement) {
+            return { current: mockVideoElement as HTMLVideoElement };
+        } else if (initialValue === null && !isVideoElement) { 
+             // Assumes playerContainerRef is initialized with null and isn't the video element
              return { current: mockPlayerContainerElement as HTMLDivElement };
         }
-        return { current: initialValue === null ? mockVideoElement as HTMLVideoElement : initialValue };
+        // Default case for other refs
+        return { current: initialValue };
     });
 
 
@@ -156,13 +167,14 @@ describe('VideoPlayerComponent', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders video element with correct src and poster and ensures native controls are off', () => {
+  it('renders video element with correct src, poster, ensures native controls are off, and has playsInline', () => {
     render(<VideoPlayerComponent movie={mockMovie} />);
     const videoElement = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` });
     expect(videoElement).toBeInTheDocument();
     expect(videoElement).toHaveAttribute('src', mockMovie.videoUrl);
     expect(videoElement).toHaveAttribute('poster', mockMovie.posterUrl);
     expect(mockVideoElement.controls).toBe(false); 
+    expect(mockVideoElement.playsInline).toBe(true); // Check for playsInline
   });
   
   it('attempts to play video on mount', async () => {
@@ -429,7 +441,7 @@ describe('VideoPlayerComponent', () => {
       });
     });
 
-    it('on mobile, clicking player area toggles fullscreen, shows UI, and ensures native controls are off', async () => {
+    it('on mobile, clicking player area toggles fullscreen, shows UI, and ensures native controls remain off', async () => {
       (useIsMobile as vi.Mock).mockReturnValue(true); // Mobile
       const user = userEvent.setup();
       render(<VideoPlayerComponent movie={mockMovie} />);
@@ -451,7 +463,8 @@ describe('VideoPlayerComponent', () => {
         if (window.screen?.orientation?.lock) {
             expect(window.screen.orientation.lock).toHaveBeenCalledWith('landscape');
         }
-        expect(mockVideoElement.play).toHaveBeenCalledTimes(1); 
+        // Play is not called on mobile player click, only fullscreen
+        expect(mockVideoElement.play).toHaveBeenCalledTimes(1); // Initial auto-play attempt
         expect(mockVideoElement.pause).not.toHaveBeenCalled();
         expect(mockVideoElement.controls).toBe(false);
         expect(screen.getByLabelText('Video progress').closest('div[style*="opacity: 1"]')).toBeTruthy();
@@ -498,7 +511,10 @@ describe('VideoPlayerComponent', () => {
     (useIsMobile as vi.Mock).mockReturnValue(true);
     vi.clearAllMocks(); 
     const { rerender } = render(<VideoPlayerComponent movie={mockMovie} />);
+    // We need to re-initialize the React component with new props/state
+    // Forcing a re-render helps ensure the isMobile state is correctly picked up.
     rerender(<VideoPlayerComponent movie={mockMovie} />); 
+
 
     const requestFullscreenMock = mockPlayerContainerElement.requestFullscreen ||
                                   mockPlayerContainerElement.webkitRequestFullscreen ||

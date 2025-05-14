@@ -64,6 +64,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     if (!video) return;
 
     video.controls = false; // Ensure native controls are always off
+    video.playsInline = true; // Crucial for iOS custom controls
 
     const handlePlay = () => { setIsPaused(false); setShowPlayerUI(true); startUiHideTimer(); };
     const handlePause = () => { setIsPaused(true); setShowPlayerUI(true); clearUiTimeout(); };
@@ -110,15 +111,14 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   }, [movie.id, startUiHideTimer, clearUiTimeout]);
 
   useEffect(() => {
-    const video = videoRef.current; // Capture video instance for use in event handlers
+    const video = videoRef.current; 
 
     const handleFullscreenChange = () => {
       const doc = document as any;
       const isCurrentlyFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
       setIsFullscreen(isCurrentlyFullscreen);
-      // Re-assert that native controls are off, especially when exiting/entering fullscreen
       if (video) {
-        video.controls = false;
+        video.controls = false; // Re-assert native controls are off
       }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -126,14 +126,13 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
-    // Initial check in case component mounts into fullscreen state
     if (video) {
         const doc = document as any;
         const isCurrentlyFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
         if (isCurrentlyFullscreen) {
             setIsFullscreen(true);
-            video.controls = false; 
         }
+        video.controls = false; // Ensure native controls are off initially
     }
 
     return () => {
@@ -142,7 +141,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
-  }, []); // Empty dependency array, videoRef.current is stable for the lifetime of the component
+  }, []); 
 
   const handleMouseMoveOnPlayer = useCallback(() => {
     setShowPlayerUI(true);
@@ -155,6 +154,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     if (e) e.stopPropagation();
     const video = videoRef.current;
     if (!video) return;
+    video.controls = false; // Re-assert
     if (video.paused || video.ended) {
       video.play();
     } else {
@@ -167,16 +167,18 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     if (!playerContainerRef.current) return;
 
     const playerElement = playerContainerRef.current as any;
+    const video = videoRef.current;
+    if (video) video.controls = false; // Re-assert before attempting fullscreen
 
     try {
       if (!isFullscreen) {
         if (playerElement.requestFullscreen) {
           await playerElement.requestFullscreen();
-        } else if (playerElement.webkitRequestFullscreen) { // Safari
+        } else if (playerElement.webkitRequestFullscreen) { 
           await playerElement.webkitRequestFullscreen();
-        } else if (playerElement.mozRequestFullScreen) { // Firefox
+        } else if (playerElement.mozRequestFullScreen) { 
           await playerElement.mozRequestFullScreen();
-        } else if (playerElement.msRequestFullscreen) { // IE/Edge
+        } else if (playerElement.msRequestFullscreen) { 
           await playerElement.msRequestFullscreen();
         }
 
@@ -191,11 +193,11 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         const doc = document as any;
         if (doc.exitFullscreen) {
           await doc.exitFullscreen();
-        } else if (doc.webkitExitFullscreen) { // Safari
+        } else if (doc.webkitExitFullscreen) { 
           await doc.webkitExitFullscreen();
-        } else if (doc.mozCancelFullScreen) { // Firefox
+        } else if (doc.mozCancelFullScreen) { 
           await doc.mozCancelFullScreen();
-        } else if (doc.msExitFullscreen) { // IE/Edge
+        } else if (doc.msExitFullscreen) { 
           await doc.msExitFullscreen();
         }
 
@@ -210,31 +212,24 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     } catch (error) {
       console.error("Fullscreen API error:", error);
     }
-     // Ensure controls are definitely off after attempting fullscreen change
-    if (videoRef.current) {
-      videoRef.current.controls = false;
-    }
+    if (video) video.controls = false; // Re-assert after attempting fullscreen change
   };
 
   const handlePlayerClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, [role="slider"], [role="menuitem"]')) {
-      return; // Click was on a control, not the player background
-    }
-
-    // Make player UI visible on any click/tap on the player area itself
-    // and manage its auto-hide timer.
-    setShowPlayerUI(true);
-    if (videoRef.current && !videoRef.current.paused) {
-      startUiHideTimer();
-    } else {
-      clearUiTimeout(); // If paused, ensure UI stays visible
+      return; 
     }
     
-    // Re-assert native controls are off, as a safeguard before interaction
-    if (videoRef.current) {
-      videoRef.current.controls = false;
-    }
+    const video = videoRef.current;
+    if (video) video.controls = false;
 
+    setShowPlayerUI(true);
+    if (video && !video.paused) {
+      startUiHideTimer();
+    } else {
+      clearUiTimeout(); 
+    }
+    
     if (isMobile) {
       toggleFullscreen(); 
     } else {
@@ -244,7 +239,11 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
   const handleResumePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
-    videoRef.current?.play();
+    const video = videoRef.current;
+    if(video) {
+      video.controls = false;
+      video.play();
+    }
   };
 
   const handleSeek = (value: number) => {
@@ -274,7 +273,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       videoRef.current.muted = !videoRef.current.muted;
       setIsMuted(videoRef.current.muted);
       if (!videoRef.current.muted && videoRef.current.volume === 0) {
-        videoRef.current.volume = 0.5; // Restore to a default volume if unmuting at 0
+        videoRef.current.volume = 0.5; 
         setVolume(0.5);
       }
     }
@@ -311,7 +310,8 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         poster={movie.posterUrl || `https://picsum.photos/seed/${movie.id}-poster/1280/720`}
         aria-label={`Video player for ${movie.title}`}
         data-ai-hint="movie video"
-        onClick={(e) => e.stopPropagation()} // Prevent video's own click handling if any
+        playsInline // Added for iOS custom controls
+        onClick={(e) => e.stopPropagation()} 
       >
         Your browser does not support the video tag.
       </video>
@@ -320,7 +320,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       {isPaused && showPlayerUI && (
         <div
           className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-20"
-          onClick={(e) => e.stopPropagation()} // Prevent propagation to player click
+          onClick={(e) => e.stopPropagation()} 
         >
           <div className="absolute top-0 left-0 p-4 md:p-6 max-w-sm text-white">
             <h1 className="text-2xl md:text-3xl font-bold mb-2 line-clamp-2 shadow-text">{movie.title}</h1>

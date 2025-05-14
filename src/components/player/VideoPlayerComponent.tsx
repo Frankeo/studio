@@ -110,14 +110,31 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   }, [movie.id, startUiHideTimer, clearUiTimeout]);
 
   useEffect(() => {
+    const video = videoRef.current; // Capture video instance for use in event handlers
+
     const handleFullscreenChange = () => {
       const doc = document as any;
-      setIsFullscreen(!!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement));
+      const isCurrentlyFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+      setIsFullscreen(isCurrentlyFullscreen);
+      // Re-assert that native controls are off, especially when exiting/entering fullscreen
+      if (video) {
+        video.controls = false;
+      }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    // Initial check in case component mounts into fullscreen state
+    if (video) {
+        const doc = document as any;
+        const isCurrentlyFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+        if (isCurrentlyFullscreen) {
+            setIsFullscreen(true);
+            video.controls = false; 
+        }
+    }
 
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
@@ -125,7 +142,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
-  }, []);
+  }, []); // Empty dependency array, videoRef.current is stable for the lifetime of the component
 
   const handleMouseMoveOnPlayer = useCallback(() => {
     setShowPlayerUI(true);
@@ -192,19 +209,36 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       }
     } catch (error) {
       console.error("Fullscreen API error:", error);
-      // Potentially update UI or show a toast if fullscreen fails
+    }
+     // Ensure controls are definitely off after attempting fullscreen change
+    if (videoRef.current) {
+      videoRef.current.controls = false;
     }
   };
 
   const handlePlayerClick = (e: React.MouseEvent) => {
-     // Only toggle play/pause if the click is not on an interactive control element
     if ((e.target as HTMLElement).closest('button, [role="slider"], [role="menuitem"]')) {
-      return;
+      return; // Click was on a control, not the player background
     }
-    if (isMobile) {
-      toggleFullscreen(); // On mobile, tap player to toggle fullscreen/landscape
+
+    // Make player UI visible on any click/tap on the player area itself
+    // and manage its auto-hide timer.
+    setShowPlayerUI(true);
+    if (videoRef.current && !videoRef.current.paused) {
+      startUiHideTimer();
     } else {
-      togglePlayPause(); // On desktop, tap player to toggle play/pause
+      clearUiTimeout(); // If paused, ensure UI stays visible
+    }
+    
+    // Re-assert native controls are off, as a safeguard before interaction
+    if (videoRef.current) {
+      videoRef.current.controls = false;
+    }
+
+    if (isMobile) {
+      toggleFullscreen(); 
+    } else {
+      togglePlayPause(); 
     }
   };
 

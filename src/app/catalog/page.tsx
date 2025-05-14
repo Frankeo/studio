@@ -9,7 +9,7 @@ import type { Movie } from '@/types/movie';
 import MovieGrid from '@/components/catalog/MovieGrid';
 import Header from '@/components/layout/Header';
 import FeaturedMoviesSection from '@/components/catalog/FeaturedMoviesSection';
-import { Loader2 } from 'lucide-react';
+import { Clapperboard } from 'lucide-react'; // Changed from Loader2
 import type { DocumentSnapshot } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 
@@ -137,7 +137,7 @@ export default function CatalogPage() {
       <>
         <Header />
         <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <Clapperboard className="h-16 w-16 text-primary animate-pulse" />
         </div>
         <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border">
          © {new Date().getFullYear()} StreamVerse. All rights reserved.
@@ -169,14 +169,14 @@ export default function CatalogPage() {
         <h1 className="text-3xl font-bold mb-8 text-foreground">Movie Catalog</h1>
         {isLoading && movies.length === 0 && ( // Show grid loading only if it's the initial load for the grid
            <div className="flex justify-center py-10">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <Clapperboard className="h-12 w-12 text-primary animate-pulse" />
           </div>
         )}
         {!isLoading && <MovieGrid movies={movies} />}
         
         {isFetchingMore && !isLoading && ( 
           <div className="flex justify-center py-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <Clapperboard className="h-10 w-10 text-primary animate-pulse" />
           </div>
         )}
         {!isFetchingMore && hasMore && movies.length > 0 && !isLoading && (

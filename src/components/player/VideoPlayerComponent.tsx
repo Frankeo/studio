@@ -417,11 +417,9 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-              {!isMobile && (
-                <Button variant="ghost" size="icon" onClick={toggleFullscreen} aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
-                  {isFullscreen ? <Minimize className="h-5 w-5 md:h-6 md:w-6" /> : <Maximize className="h-5 w-5 md:h-6 md:w-6" />}
-                </Button>
-              )}
+              <Button variant="ghost" size="icon" onClick={toggleFullscreen} aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
+                {isFullscreen ? <Minimize className="h-5 w-5 md:h-6 md:w-6" /> : <Maximize className="h-5 w-5 md:h-6 md:w-6" />}
+              </Button>
             </div>
           </div>
         </div>

@@ -284,7 +284,7 @@ describe('VideoPlayerComponent', () => {
       });
     });
 
-    it('toggles fullscreen via fullscreen button (desktop only) and ensures native controls remain off', async () => {
+    it('toggles fullscreen via fullscreen button and ensures native controls remain off', async () => {
       (useIsMobile as vi.Mock).mockReturnValue(false); // Desktop
       const user = userEvent.setup();
       render(<VideoPlayerComponent movie={mockMovie} />);
@@ -331,11 +331,10 @@ describe('VideoPlayerComponent', () => {
        expect(await screen.findByLabelText('Enter fullscreen')).toBeInTheDocument();
     });
 
-    it('does not show fullscreen button in control bar on mobile', () => {
+    it('shows fullscreen button in control bar on mobile', () => {
       (useIsMobile as vi.Mock).mockReturnValue(true); // Mobile
       render(<VideoPlayerComponent movie={mockMovie} />);
-      expect(screen.queryByLabelText('Enter fullscreen')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Exit fullscreen')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Enter fullscreen')).toBeInTheDocument();
     });
 
 

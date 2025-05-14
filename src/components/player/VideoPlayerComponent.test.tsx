@@ -33,6 +33,9 @@ let mockPlayerContainerElement: HTMLDivElement;
 
 describe('VideoPlayerComponent', () => {
   let useRefSpy: Mock;
+  // Helper to simulate internal setShowPlayerUI state for testing opacity changes directly
+  let setShowPlayerUIState: React.Dispatch<React.SetStateAction<boolean>> | undefined;
+
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -52,18 +55,19 @@ describe('VideoPlayerComponent', () => {
       playsInline: false, // initial state for playsInline
       play: vi.fn(() => {
         mockVideoElement.paused = false;
-        // Simulate the 'play' event
         const event = new Event('play');
         mockVideoElement.dispatchEvent(event);
         return Promise.resolve();
       }),
       pause: vi.fn(() => {
         mockVideoElement.paused = true;
-        // Simulate the 'pause' event
         const event = new Event('pause');
         mockVideoElement.dispatchEvent(event);
       }),
-      addEventListener: vi.fn(),
+      addEventListener: vi.fn((event, callback) => {
+        // Minimal mock for addEventListener to track calls if needed
+        // or to manually trigger events for testing
+      }),
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(HTMLMediaElement.prototype.dispatchEvent), // Use the real dispatchEvent for actual events
       // Mock Fullscreen API related properties for the video element if it were the target
@@ -141,6 +145,7 @@ describe('VideoPlayerComponent', () => {
     const mockOrientation: ScreenMobile = { // Use ScreenMobile type
         lock: vi.fn(() => Promise.resolve()),
         unlock: vi.fn(),
+        type: 'landscape-primary' // Add a default type
     };
     Object.defineProperty(window.screen, 'orientation', { configurable: true, value: mockOrientation });
 
@@ -154,12 +159,28 @@ describe('VideoPlayerComponent', () => {
         if (refCallCount === 2) return { current: mockPlayerContainerElement };
         return { current: null }; // For uiTimeoutRef
     });
+
+    // Mock React.useState to capture setShowPlayerUI setter
+    // This is a bit more involved if you have multiple boolean states.
+    // For simplicity, assuming the first boolean useState is for showPlayerUI.
+    // A more robust way would be to identify it by its initial value or context.
+    setShowPlayerUIState = undefined; // Reset for each test
+    const originalUseState = React.useState;
+    vi.spyOn(React, 'useState').mockImplementation((initialValue: any) => {
+      const [state, setState] = originalUseState(initialValue);
+      if (typeof initialValue === 'boolean' && initialValue === true && !setShowPlayerUIState) {
+        // Assuming showPlayerUI is the one starting true and we haven't captured it yet
+        setShowPlayerUIState = setState as React.Dispatch<React.SetStateAction<boolean>>;
+      }
+      return [state, setState];
+    });
+
   });
 
   afterEach(() => {
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
-    vi.restoreAllMocks(); // This will restore the original React.useRef
+    vi.restoreAllMocks(); // This will restore the original React.useRef and React.useState
 
     // Clean up fullscreen element properties on document
     Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
@@ -236,48 +257,67 @@ describe('VideoPlayerComponent', () => {
   });
 
 
-  it('pauses video on player area click (if playing), does nothing if paused (desktop)', () => {
+  it('toggles play/pause on player area click (desktop)', async () => {
     (useIsMobile as Mock).mockReturnValue(false); // Simulate desktop
     render(<VideoPlayerComponent movie={mockMovie} />);
     const playerArea = screen.getByTestId('video-player').parentElement!;
 
-    // Initially playing
+    // Scenario 1: Video is playing, click to pause
     mockVideoElement.paused = false;
     mockVideoElement.play.mockClear();
     mockVideoElement.pause.mockClear();
+    
     fireEvent.click(playerArea);
     expect(mockVideoElement.pause).toHaveBeenCalledTimes(1);
     expect(mockVideoElement.play).not.toHaveBeenCalled();
 
-    // Now paused, click again
-    mockVideoElement.paused = true;
+    // Scenario 2: Video is paused, click to play
+    mockVideoElement.paused = true; // Set to paused
+    // Simulate the 'pause' event if necessary for state update in component
+    const pauseEvent = new Event('pause');
+    mockVideoElement.dispatchEvent(pauseEvent);
+    
     mockVideoElement.play.mockClear();
     mockVideoElement.pause.mockClear();
+
     fireEvent.click(playerArea);
-    expect(mockVideoElement.play).not.toHaveBeenCalled();
+    expect(mockVideoElement.play).toHaveBeenCalledTimes(1);
     expect(mockVideoElement.pause).not.toHaveBeenCalled();
   });
 
-  it('pauses video on player area click (if playing), does nothing if paused (mobile)', () => {
+  it('toggles play/pause on player area click and shows UI (mobile)', async () => {
     (useIsMobile as Mock).mockReturnValue(true); // Simulate mobile
     render(<VideoPlayerComponent movie={mockMovie} />);
     const playerArea = screen.getByTestId('video-player').parentElement!;
+    const controlsBar = screen.getByTestId('video-controls-bar');
 
-    // Initially playing
+    // Scenario 1: Video is playing, UI initially hidden, click to pause and show UI
     mockVideoElement.paused = false;
+    if (setShowPlayerUIState) act(() => setShowPlayerUIState!(false)); // Force hide UI
+    await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 0'));
+    
     mockVideoElement.play.mockClear();
     mockVideoElement.pause.mockClear();
+
     fireEvent.click(playerArea);
     expect(mockVideoElement.pause).toHaveBeenCalledTimes(1);
     expect(mockVideoElement.play).not.toHaveBeenCalled();
+    await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 1'));
 
-    // Now paused, click again
+    // Scenario 2: Video is paused, UI initially hidden, click to play and show UI
     mockVideoElement.paused = true;
+    const pauseEvent = new Event('pause'); // Ensure component state updates
+    mockVideoElement.dispatchEvent(pauseEvent);
+    if (setShowPlayerUIState) act(() => setShowPlayerUIState!(false)); // Force hide UI
+    await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 0'));
+
     mockVideoElement.play.mockClear();
     mockVideoElement.pause.mockClear();
+    
     fireEvent.click(playerArea);
-    expect(mockVideoElement.play).not.toHaveBeenCalled();
+    expect(mockVideoElement.play).toHaveBeenCalledTimes(1);
     expect(mockVideoElement.pause).not.toHaveBeenCalled();
+    await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 1'));
   });
 
 
@@ -285,14 +325,7 @@ describe('VideoPlayerComponent', () => {
     render(<VideoPlayerComponent movie={mockMovie} />);
     const progressSlider = screen.getByLabelText('Video progress').querySelector('span[role="slider"]')!;
 
-    // JSDOM doesn't fully support slider interaction, so we simulate by setting value directly
-    // and dispatching an event if needed, or directly calling the handler.
-    // Here, we'll directly test the handler's effect
-    fireEvent.mouseDown(progressSlider); // Simulate interaction start
-    // This is tricky; direct simulation of onValueChange is more reliable
-    // For ShadCN slider, it's more about the underlying Radix behavior.
-    // We can assume the onValueChange prop is called.
-    // Let's test if changing currentTime updates the slider visually (via state)
+    fireEvent.mouseDown(progressSlider); 
     act(() => {
         mockVideoElement.currentTime = 300; // Halfway
         const timeUpdateEvent = new Event('timeupdate');
@@ -321,17 +354,13 @@ describe('VideoPlayerComponent', () => {
     // Unmute
     await userEvent.click(screen.getByLabelText('Unmute'));
     expect(mockVideoElement.muted).toBe(false);
-     // When unmuting from a zero volume state (due to mute), volume might be restored.
-     // If it was 0 before mute, it might stay 0 or be set to a default.
-     // Test checks if it's not muted and slider reflects current volume.
     await waitFor(() => expect(screen.getByLabelText('Mute')).toBeInTheDocument());
-    expect(volumeSliderInput).toHaveAttribute('aria-valuenow', String(mockVideoElement.volume));
+    expect(volumeSliderInput).toHaveAttribute('aria-valuenow', String(mockVideoElement.volume)); // Should restore previous volume or a default
   });
 
 
   it('changes volume via volume slider', async () => {
     render(<VideoPlayerComponent movie={mockMovie} />);
-     // Simulate setting the slider value
     act(() => {
         mockVideoElement.volume = 0.5;
         const volumeChangeEvent = new Event('volumechange');
@@ -350,20 +379,19 @@ describe('VideoPlayerComponent', () => {
     const speedButton = screen.getByLabelText('Playback speed 1x');
     await userEvent.click(speedButton);
 
-    const speedOption = await screen.findByText('1.5x'); // Assumes 1.5x is an option
+    const speedOption = await screen.findByText('1.5x'); 
     await userEvent.click(speedOption);
 
     expect(mockVideoElement.playbackRate).toBe(1.5);
     await waitFor(() => expect(screen.getByLabelText('Playback speed 1.5x')).toBeInTheDocument());
   });
 
-  it('toggles fullscreen via fullscreen button', async () => {
+  it('toggles fullscreen via fullscreen button (always visible)', async () => {
     render(<VideoPlayerComponent movie={mockMovie} />);
     const fullscreenButton = screen.getByLabelText('Enter fullscreen');
 
     // Enter fullscreen
     await userEvent.click(fullscreenButton);
-    // Check if one of the requestFullscreen methods was called on the player container
     expect(mockPlayerContainerElement.requestFullscreen ||
            mockPlayerContainerElement.webkitRequestFullscreen ||
            mockPlayerContainerElement.mozRequestFullScreen ||
@@ -389,22 +417,18 @@ describe('VideoPlayerComponent', () => {
     const controlsBar = screen.getByTestId('video-controls-bar');
     const playerContainer = screen.getByTestId('video-player').parentElement!;
 
-    // Initially, UI might be visible due to autoplay attempt or initial render
-    // Ensure video is 'playing' for hide timer to activate
     mockVideoElement.paused = false;
-    mockVideoElement.play(); // Trigger play and its side effects (like startUiHideTimer)
+    // Simulate play event which should make UI visible and start timer
+    const playEvent = new Event('play');
+    mockVideoElement.dispatchEvent(playEvent);
 
-    // Wait for UI to become visible after play (if it wasn't already)
     await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 1'));
 
-
-    // Fast-forward timers to hide UI
     act(() => {
       vi.advanceTimersByTime(3000); // uiTimeoutRef duration
     });
     await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 0'));
 
-    // Simulate mouse move to show UI again
     fireEvent.mouseMove(playerContainer);
     await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 1'));
   });
@@ -414,24 +438,24 @@ describe('VideoPlayerComponent', () => {
     render(<VideoPlayerComponent movie={mockMovie} />);
     const controlsBar = screen.getByTestId('video-controls-bar');
 
-    mockVideoElement.paused = true; // Start as paused
-    mockVideoElement.pause(); // Trigger pause and its side effects
+    mockVideoElement.paused = true; 
+    const pauseEvent = new Event('pause');
+    mockVideoElement.dispatchEvent(pauseEvent); // Ensure component state updates and UI is shown
 
     await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 1'));
 
-    // Fast-forward timers
     act(() => {
-      vi.advanceTimersByTime(5000); // More than hide timeout
+      vi.advanceTimersByTime(5000); 
     });
-    // UI should still be visible because video is paused
-    expect(controlsBar).toHaveStyle('opacity: 1');
+    expect(controlsBar).toHaveStyle('opacity: 1'); // UI should still be visible
   });
 
     it('renders VideoNotAvailable message if movie.videoUrl is missing', () => {
         const movieWithoutVideo: Movie = { ...mockMovie, videoUrl: '' };
         render(<VideoPlayerComponent movie={movieWithoutVideo} />);
         expect(screen.getByText(`Video source not available for ${movieWithoutVideo.title}.`)).toBeInTheDocument();
-        expect(screen.getByTestId('video-player')).not.toBeInTheDocument(); // Video element shouldn't render
+        // Video element shouldn't render, so don't try to getByTestId for it.
+        expect(screen.queryByTestId('video-player')).not.toBeInTheDocument();
     });
 
     it('ensures video.controls is false and playsInline is true', () => {
@@ -440,9 +464,8 @@ describe('VideoPlayerComponent', () => {
         expect(mockVideoElement.playsInline).toBe(true);
     });
 
-    it('correctly formats time display', () => {
+    it('correctly formats time display', async () => {
         render(<VideoPlayerComponent movie={mockMovie} />);
-        // Simulate time updates
         act(() => {
             mockVideoElement.currentTime = 70; // 1 minute 10 seconds
             mockVideoElement.duration = 135; // 2 minutes 15 seconds
@@ -452,12 +475,12 @@ describe('VideoPlayerComponent', () => {
             mockVideoElement.dispatchEvent(loadedMetaEvent);
         });
         
-        waitFor(() => {
+        await waitFor(() => {
           expect(screen.getByText('01:10 / 02:15')).toBeInTheDocument();
         });
     });
 
-    it('shows fullscreen button on mobile', () => {
+    it('shows fullscreen button on mobile (as per latest requirement)', () => {
       (useIsMobile as Mock).mockReturnValue(true);
       render(<VideoPlayerComponent movie={mockMovie} />);
       expect(screen.getByLabelText('Enter fullscreen')).toBeInTheDocument();
@@ -469,55 +492,33 @@ describe('VideoPlayerComponent', () => {
         expect(screen.getByLabelText('Enter fullscreen')).toBeInTheDocument();
     });
 
-    it('player click on mobile shows UI and pauses if playing', () => {
+    it('player click on mobile shows UI and toggles play/pause', async () => {
         (useIsMobile as Mock).mockReturnValue(true);
         render(<VideoPlayerComponent movie={mockMovie} />);
         const playerArea = screen.getByTestId('video-player').parentElement!;
         const controlsBar = screen.getByTestId('video-controls-bar');
 
-        // Start playing, hide UI initially for test clarity
+        // Start playing, hide UI for test clarity
         mockVideoElement.paused = false;
-        act(() => { vi.advanceTimersByTime(3000); }); // Hide UI
-        expect(controlsBar).toHaveStyle('opacity: 0');
+        if (setShowPlayerUIState) act(() => setShowPlayerUIState!(false));
+        await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 0'));
 
-
-        fireEvent.click(playerArea);
+        fireEvent.click(playerArea); // Click to pause
         expect(mockVideoElement.pause).toHaveBeenCalledTimes(1);
-        expect(controlsBar).toHaveStyle('opacity: 1');
-    });
+        await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 1'));
 
-    it('player click on mobile shows UI and does nothing if paused', () => {
-        (useIsMobile as Mock).mockReturnValue(true);
-        render(<VideoPlayerComponent movie={mockMovie} />);
-        const playerArea = screen.getByTestId('video-player').parentElement!;
-        const controlsBar = screen.getByTestId('video-controls-bar');
+        // Now paused, click to play
+        mockVideoElement.paused = true; // Simulate paused state
+        const pauseEvent = new Event('pause'); // Trigger event to update component state
+        mockVideoElement.dispatchEvent(pauseEvent);
+        if (setShowPlayerUIState) act(() => setShowPlayerUIState!(false)); // Hide UI again
+        await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 0'));
         
-        mockVideoElement.paused = true;
-        mockVideoElement.play.mockClear();
-        mockVideoElement.pause.mockClear();
+        mockVideoElement.play.mockClear(); // Clear previous calls
 
-        // Hide UI initially for test clarity
-        act(() => {setShowPlayerUIState(false);}); // Helper to directly set state if needed, or use timers
-        expect(controlsBar).toHaveStyle('opacity: 0');
-
-
-        fireEvent.click(playerArea);
-        expect(mockVideoElement.play).not.toHaveBeenCalled();
-        expect(mockVideoElement.pause).not.toHaveBeenCalled();
-        expect(controlsBar).toHaveStyle('opacity: 1');
+        fireEvent.click(playerArea); // Click to play
+        expect(mockVideoElement.play).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(controlsBar).toHaveStyle('opacity: 1'));
     });
-
-    // Helper to simulate internal setShowPlayerUI state for testing opacity changes directly
-    // This is a bit of a hack, ideally we'd rely purely on interaction + timers
-    let setShowPlayerUIState: React.Dispatch<React.SetStateAction<boolean>>;
-    vi.spyOn(React, 'useState').mockImplementation((initialState) => {
-        if (typeof initialState === 'boolean' && initialState === true) { // Assuming showPlayerUI is the one starting true
-            const [state, setState] = React.useState(initialState);
-            setShowPlayerUIState = setState as React.Dispatch<React.SetStateAction<boolean>>;
-            return [state, setState];
-        }
-        return React.useState(initialState);
-    });
-
-
 });
+

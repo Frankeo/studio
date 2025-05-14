@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useAuth } from '@/context/AuthContext'; // Use ES Module import
 import LoginForm from './LoginForm';
 import type { AuthContextType } from '@/context/interfaces'; // Import the type
+import { Mock } from 'vitest';
 
 // Mocks
 const mockPush = vi.fn();
@@ -50,7 +51,7 @@ describe('LoginForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset to default mock implementation before each test using the imported hook
-    (useAuth as vi.Mock).mockImplementation(() => mockUseAuth());
+    (useAuth as Mock).mockImplementation(() => mockUseAuth());
   });
 
   it('renders the login form correctly', () => {
@@ -158,7 +159,7 @@ describe('LoginForm', () => {
   });
 
   it('disables buttons when isLoading', async () => {
-     (useAuth as vi.Mock).mockImplementation(() => mockUseAuth());
+     (useAuth as Mock).mockImplementation(() => mockUseAuth());
     const { rerender } = render(<LoginForm />);
 
     // Simulate loading state for email sign-in
@@ -175,7 +176,7 @@ describe('LoginForm', () => {
 
     // Reset mocks and component state for next part of test
     vi.clearAllMocks();
-    (useAuth as vi.Mock).mockImplementation(() => mockUseAuth()); // Reset to non-loading
+    (useAuth as Mock).mockImplementation(() => mockUseAuth()); // Reset to non-loading
     rerender(<LoginForm />);
 
 

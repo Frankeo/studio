@@ -49,5 +49,28 @@ vi.mock('@/hooks/use-toast', () => ({
   }),
 }));
 
+Object.defineProperty(global.HTMLMediaElement.prototype, 'play', {
+  configurable: true,
+  get() {
+    return () => {
+      return Promise.resolve();
+    };
+  },
+});
+
+// Mock ResizeObserver
+class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+Object.defineProperty(global, 'ResizeObserver', {
+  value: ResizeObserver,
+});
 
 // If you have other global mocks or setup, add them here
+// Mock the Pointer Capture API
+Element.prototype.setPointerCapture = vi.fn();
+Element.prototype.hasPointerCapture = vi.fn();
+Element.prototype.releasePointerCapture = vi.fn();

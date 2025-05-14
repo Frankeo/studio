@@ -84,7 +84,6 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     setPlaybackRate(video.playbackRate);
     setIsPaused(video.paused);
 
-
     video.play().then(() => {
       // Autoplay started
     }).catch(() => {
@@ -309,6 +308,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       onClick={handlePlayerClick} // Main click handler for the player area
     >
       <video
+        data-testid="video-player"
         ref={videoRef}
         src={movie.videoUrl}
         className="w-full h-full object-contain"
@@ -400,6 +400,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
             </Button>
             <div className="w-16 md:w-20"> {/* Volume Slider Container */}
               <Slider
+                data-testid="volume-slider"
                 value={[isMuted ? 0 : volume]}
                 max={1}
                 step={0.01}

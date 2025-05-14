@@ -80,7 +80,7 @@ export default function FeaturedMoviesSection({ movies, isLoading }: FeaturedMov
           <Skeleton className="absolute inset-0 w-full h-full" />
           <div className={cn(
               "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/70 via-black/30 to-transparent",
-              isMobile ? "p-4" : "p-6 md:p-10 lg:p-16"
+              isMobile ? "pt-4 px-4 pb-12" : "p-6 md:p-10 lg:p-16" // Adjusted mobile padding
             )}>
             <Skeleton className="h-8 md:h-10 w-3/4 md:w-1/2 mb-3 md:mb-4 rounded" aria-label="Title Skeleton" />
             {!isMobile && (
@@ -128,7 +128,7 @@ export default function FeaturedMoviesSection({ movies, isLoading }: FeaturedMov
               />
               <div className={cn(
                   "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/40 to-transparent",
-                  isMobile ? "p-4" : "p-6 md:p-10 lg:p-16"
+                  isMobile ? "pt-4 px-4 pb-12" : "p-6 md:p-10 lg:p-16" // Adjusted mobile padding
                 )}>
                 <h3 className={cn(
                     "font-bold text-white mb-3 md:mb-4 line-clamp-2 shadow-text",

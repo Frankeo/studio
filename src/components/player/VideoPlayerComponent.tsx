@@ -148,8 +148,8 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
     
     if (video) {
-        video.addEventListener('webkitbeginfullscreen', () => setIsFullscreen(true));
-        video.addEventListener('webkitendfullscreen', () => setIsFullscreen(false));
+        video.addEventListener('webkitbeginfullscreen', () => {setIsFullscreen(true); if(video) video.controls = false;});
+        video.addEventListener('webkitendfullscreen', () => {setIsFullscreen(false); if(video) video.controls = false;});
     }
 
 
@@ -168,8 +168,8 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
       if (video) {
-        video.removeEventListener('webkitbeginfullscreen', () => setIsFullscreen(true));
-        video.removeEventListener('webkitendfullscreen', () => setIsFullscreen(false));
+        video.removeEventListener('webkitbeginfullscreen', () => {setIsFullscreen(true); if(video) video.controls = false;});
+        video.removeEventListener('webkitendfullscreen', () => {setIsFullscreen(false); if(video) video.controls = false;});
       }
     };
   }, []);
@@ -187,7 +187,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     if (!video) return;
     video.controls = false;
     if (video.paused || video.ended) {
-      video.play();
+      video.play().catch(err => console.error("Play error:", err));
     } else {
       video.pause();
     }
@@ -201,7 +201,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     if (!video && !playerElement) return;
 
     const doc = document as Document & {
-        webkitExitFullscreen?: () => Promise<void>;
+        webkitExitFullscreen?: () => Promise<void> | void; // Adjusted for iOS
         mozCancelFullScreen?: () => Promise<void>;
         msExitFullscreen?: () => Promise<void>;
         webkitIsFullScreen?: boolean;
@@ -210,9 +210,8 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
     try {
       if (!isFullscreen) {
-        
         if (video && typeof video.webkitEnterFullscreen === 'function') {
-          video.webkitEnterFullscreen();
+          video.webkitEnterFullscreen(); // For iOS Safari
         } else if (playerElement) { 
           if (playerElement.requestFullscreen) {
             await playerElement.requestFullscreen();
@@ -233,9 +232,8 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           }
         }
       } else {
-        
         if (video && typeof video.webkitExitFullscreen === 'function') {
-          video.webkitExitFullscreen();
+          video.webkitExitFullscreen(); // For iOS Safari
         } else if (doc.exitFullscreen) { 
           await doc.exitFullscreen();
         } else if (doc.webkitExitFullscreen) {
@@ -274,7 +272,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     setShowPlayerUI(true); // Always show UI on tap
   
     if (video.paused || video.ended) {
-      video.play();
+      video.play().catch(err => console.error("Play error on screen click:", err));
     } else {
       video.pause();
     }
@@ -287,7 +285,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     if(video) {
       video.controls = false;
       if (video.paused || video.ended) {
-        video.play();
+        video.play().catch(err => console.error("Resume play error:", err));
       }
     }
   };
@@ -427,9 +425,9 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           max={duration || 1} 
           step={0.1}
           onValueChange={(value) => handleSeek(value[0])}
-          className="w-full h-2 mb-1 md:mb-2 group 
+          className="w-full mb-1 md:mb-2 group 
                      [&>span:first-child]:h-1 [&>span:first-child>span]:h-1 
-                     [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2"
+                     [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2 [&>span:last-child]:translate-y-px"
           aria-label="Video progress"
         />
         <div className="flex items-center justify-between text-white">
@@ -448,7 +446,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
                 step={0.01}
                 onValueChange={(value) => handleVolumeSliderChange(value[0])}
                 className="[&>span:first-child]:h-1 [&>span:first-child>span]:h-1 
-                           [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2"
+                           [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2 [&>span:last-child]:translate-y-px"
                 aria-label="Volume"
               />
             </div>

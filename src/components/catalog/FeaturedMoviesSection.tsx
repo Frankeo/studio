@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronLeft, ChevronRight, PlayCircle, Info } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile'; // Import useIsMobile
+import { cn } from '@/lib/utils';
 
 interface FeaturedMoviesSectionProps {
   movies: Movie[];
@@ -77,13 +78,20 @@ export default function FeaturedMoviesSection({ movies, isLoading }: FeaturedMov
       <section className="mb-12">
         <div className="relative w-full aspect-[16/7] md:aspect-[16/6] lg:aspect-[16/5] overflow-hidden rounded-lg bg-card shadow-2xl">
           <Skeleton className="absolute inset-0 w-full h-full" />
-          <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-10 lg:p-16 bg-gradient-to-t from-black/70 via-black/30 to-transparent">
-            <Skeleton className="h-10 w-3/4 md:w-1/2 mb-4 rounded" aria-label="Title Skeleton" /> {/* Title Skeleton */}
-            <Skeleton className="h-5 w-full md:w-3/4 mb-2 rounded" /> {/* Description Line 1 Skeleton */}
-            <Skeleton className="h-5 w-2/3 md:w-1/2 mb-6 rounded" />   {/* Description Line 2 Skeleton */}
-            <div className="flex space-x-3">
-              <Skeleton className="h-12 w-28 rounded-md" /> {/* Play Button Skeleton */}
-              <Skeleton className="h-12 w-32 rounded-md" /> {/* More Info Button Skeleton */}
+          <div className={cn(
+              "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/70 via-black/30 to-transparent",
+              isMobile ? "p-4" : "p-6 md:p-10 lg:p-16"
+            )}>
+            <Skeleton className="h-8 md:h-10 w-3/4 md:w-1/2 mb-3 md:mb-4 rounded" aria-label="Title Skeleton" />
+            {!isMobile && (
+              <>
+                <Skeleton className="h-4 md:h-5 w-full md:w-3/4 mb-1 md:mb-2 rounded" />
+                <Skeleton className="h-4 md:h-5 w-2/3 md:w-1/2 mb-4 md:mb-6 rounded" />
+              </>
+            )}
+            <div className={cn("flex", isMobile ? "justify-center" : "space-x-3")}>
+              <Skeleton className={cn("rounded-md", isMobile ? "h-10 w-24" : "h-12 w-28")} /> {/* Play Button Skeleton */}
+              {!isMobile && <Skeleton className="h-12 w-32 rounded-md" />} {/* More Info Button Skeleton */}
             </div>
           </div>
         </div>
@@ -118,24 +126,43 @@ export default function FeaturedMoviesSection({ movies, isLoading }: FeaturedMov
                 data-ai-hint="movie banner"
                 priority={index === 0} 
               />
-              <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-10 lg:p-16 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-                <h3 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2 md:mb-4 line-clamp-2 shadow-text">
+              <div className={cn(
+                  "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/40 to-transparent",
+                  isMobile ? "p-4" : "p-6 md:p-10 lg:p-16"
+                )}>
+                <h3 className={cn(
+                    "font-bold text-white mb-3 md:mb-4 line-clamp-2 shadow-text",
+                    isMobile ? "text-2xl" : "text-3xl md:text-4xl lg:text-5xl"
+                  )}>
                   {movie.title}
                 </h3>
-                <p className="text-sm md:text-base text-neutral-200 mb-4 md:mb-6 line-clamp-2 md:line-clamp-3 shadow-text max-w-prose">
-                  {movie.description}
-                </p>
-                <div className="flex space-x-3">
-                  <Button asChild size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                {!isMobile && (
+                  <p className="text-sm md:text-base text-neutral-200 mb-4 md:mb-6 line-clamp-2 md:line-clamp-3 shadow-text max-w-prose">
+                    {movie.description}
+                  </p>
+                )}
+                <div className={cn("flex", isMobile ? "justify-center" : "space-x-3")}>
+                  <Button 
+                    asChild 
+                    size={isMobile ? "default" : "lg"} 
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
                     <Link href={`/player/${movie.id}`}>
-                      <PlayCircle className="mr-2 h-5 w-5 md:h-6 md:w-6" /> Play
+                      <PlayCircle className={cn("mr-2", isMobile ? "h-5 w-5" : "h-5 w-5 md:h-6 md:w-6")} /> Play
                     </Link>
                   </Button>
-                  <Button asChild variant="secondary" size="lg" className="bg-secondary/70 hover:bg-secondary/90 text-secondary-foreground">
-                    <Link href={`/player/${movie.id}`}> 
-                      <Info className="mr-2 h-5 w-5 md:h-6 md:w-6" /> More Info
-                    </Link>
-                  </Button>
+                  {!isMobile && (
+                    <Button 
+                      asChild 
+                      variant="secondary" 
+                      size="lg" 
+                      className="bg-secondary/70 hover:bg-secondary/90 text-secondary-foreground"
+                    >
+                      <Link href={`/player/${movie.id}`}> 
+                        <Info className="mr-2 h-5 w-5 md:h-6 md:w-6" /> More Info
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -185,3 +212,4 @@ export default function FeaturedMoviesSection({ movies, isLoading }: FeaturedMov
     </section>
   );
 }
+

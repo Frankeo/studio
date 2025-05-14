@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Play, Pause, Maximize, Minimize, VolumeX, Volume1, Volume2, Gauge, Check, Clapperboard } from 'lucide-react'; // Added Clapperboard
-import { useIsMobile } from '@/hooks/use-mobile';
 import type { ScreenMobile, VideoElementWithFullscreen, VideoPlayerProps } from './interfaces';
 
 const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -37,8 +36,6 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isVideoBuffering, setIsVideoBuffering] = useState(true);
 
-  const isMobile = useIsMobile();
-
   const clearUiTimeout = useCallback(() => {
     if (uiTimeoutRef.current) {
       clearTimeout(uiTimeoutRef.current);
@@ -61,7 +58,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
     video.controls = false;
     video.playsInline = true;
-    (video as any).webkitPlaysInline = true; 
+    video.webkitPlaysInline = true; 
 
     const handlePlay = () => { setIsPaused(false); setShowPlayerUI(true); startUiHideTimer(); setIsVideoBuffering(false); };
     const handlePause = () => { setIsPaused(true); setShowPlayerUI(true); clearUiTimeout(); };

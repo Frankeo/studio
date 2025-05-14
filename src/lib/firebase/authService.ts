@@ -60,13 +60,16 @@ export const fbUpdateUserProfile = async (
   updates: { displayName?: string | null; photoURL?: string | null }
 ): Promise<void> => {
   if (!isFirebaseConfigured || !auth) {
-    // Mock update: In a real mock scenario, you might update mockUser or a similar state.
-    // For this example, we'll assume the AuthContext will handle visual updates if needed.
-    if (updates.displayName !== undefined) mockUser.displayName = updates.displayName;
-    if (updates.photoURL !== undefined) mockUser.photoURL = updates.photoURL;
-    // Note: This mock update only affects the mockUser object in memory,
-    // and doesn't persist or trigger onAuthStateChanged.
-    // The AuthContext's setUser directly might be needed for UI refresh in mock mode.
+      // Handle mock user update
+      const updatedMockUser = { ...mockUser };
+      if (updates.displayName !== undefined) {
+        updatedMockUser.displayName = updates.displayName;
+      }
+      if (updates.photoURL !== undefined) {
+        updatedMockUser.photoURL = updates.photoURL;
+      }
+      // Update the global mockUser object if necessary, or just the local state
+      Object.assign(mockUser, updatedMockUser); // Update the shared mockUser
     return Promise.resolve();
   }
   if (!currentUser) {

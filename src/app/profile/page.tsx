@@ -15,8 +15,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Clapperboard, Edit3, UserCircle, Loader2 } from 'lucide-react';
+import { getUserInitials } from '@/lib/utils'; // Import the helper function
 import Link from 'next/link';
-import type { User } from 'firebase/auth';
 
 const profileSchema = z.object({
   displayName: z.string().max(50, { message: "Display name must be 50 characters or less." }).optional().or(z.literal('')),
@@ -149,7 +149,7 @@ export default function ProfilePage() {
               <Avatar className="h-24 w-24 border-2 border-primary">
                 <AvatarImage src={currentPhotoURL || user.photoURL || undefined} alt={user.displayName || user.email || 'User'} />
                 <AvatarFallback className="text-3xl">
-                  {user.displayName ? user.displayName.charAt(0).toUpperCase() : <UserCircle className="h-12 w-12" />}
+                {getUserInitials(user) || <UserCircle className="h-12 w-12" />} 
                 </AvatarFallback>
               </Avatar>
             </div>
@@ -204,9 +204,7 @@ export default function ProfilePage() {
             <div className="space-y-3 pt-4 border-t border-border">
               <h3 className="text-lg font-semibold text-foreground">Account Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div><strong className="text-muted-foreground">User ID:</strong> <span className="break-all">{user.uid}</span></div>
                 <div><strong className="text-muted-foreground">Email:</strong> {user.email || 'N/A'}</div>
-                <div><strong className="text-muted-foreground">Email Verified:</strong> {user.emailVerified ? 'Yes' : 'No'}</div>
                 <div><strong className="text-muted-foreground">Provider:</strong> {user.providerData.length > 0 ? getProviderName(user.providerData[0].providerId) : 'N/A'}</div>
                 <div><strong className="text-muted-foreground">Account Created:</strong> {user.metadata.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'N/A'}</div>
                 <div><strong className="text-muted-foreground">Last Sign-in:</strong> {user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).toLocaleString() : 'N/A'}</div>

@@ -8,6 +8,8 @@ export interface VideoElementWithFullscreen extends HTMLVideoElement {
   webkitEnterFullscreen?: () => void; // Added for iOS Safari
   webkitExitFullscreen?: () => void;  // Added for iOS Safari
   webkitSupportsFullscreen?: boolean; // For checking support
+  webkitDisplayingFullscreen?: boolean; // For checking current state
+  webkitPlaysInline: boolean;
 }
 
 export interface VideoPlayerProps {

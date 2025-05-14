@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from '@/hooks/use-toast';
+import { getUserInitials } from '@/lib/utils'; // Import the utility function
 
 export default function Header() {
   const { user, signOut } = useAuth(); // Get user and signOut from context
@@ -44,19 +45,14 @@ export default function Header() {
           <span className="text-2xl font-bold">StreamVerse</span>
         </Link>
         <nav className="flex items-center space-x-4">
-          {user && (
-            <Link href="/catalog" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors">
-              Catalog
-            </Link>
-          )}
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || 'User'} />
-                    <AvatarFallback>
-                      {user.displayName ? user.displayName.charAt(0).toUpperCase() : <UserCircle className="h-6 w-6" />}
+                    <AvatarFallback className="text-xl capitalize">
+                      {getUserInitials(user) || <UserCircle className="h-6 w-6" />}
                     </AvatarFallback>
                   </Avatar>
                 </Button>

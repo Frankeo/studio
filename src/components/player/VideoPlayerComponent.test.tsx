@@ -280,12 +280,15 @@ describe('VideoPlayerComponent', () => {
       });
     });
 
-    it('toggles fullscreen via fullscreen button and attempts orientation lock/unlock', async () => {
+    it('toggles fullscreen via fullscreen button (desktop only) and attempts orientation lock/unlock', async () => {
+      (useIsMobile as vi.Mock).mockReturnValue(false); // Desktop
       const user = userEvent.setup();
       render(<VideoPlayerComponent movie={mockMovie} />);
       
       const enterFullscreenButton = screen.getByLabelText('Enter fullscreen');
+      expect(enterFullscreenButton).toBeInTheDocument();
       await user.click(enterFullscreenButton);
+
       await waitFor(() => {
         const requestFullscreenMock = mockPlayerContainerElement.requestFullscreen ||
                                     mockPlayerContainerElement.webkitRequestFullscreen ||
@@ -302,7 +305,9 @@ describe('VideoPlayerComponent', () => {
       act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
       
       const exitFullscreenButton = await screen.findByLabelText('Exit fullscreen');
+      expect(exitFullscreenButton).toBeInTheDocument();
       await user.click(exitFullscreenButton);
+
       await waitFor(() => {
         const exitFullscreenMock = document.exitFullscreen ||
                                    (document as any).webkitExitFullscreen ||
@@ -318,6 +323,14 @@ describe('VideoPlayerComponent', () => {
        act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
        expect(await screen.findByLabelText('Enter fullscreen')).toBeInTheDocument();
     });
+
+    it('does not show fullscreen button in control bar on mobile', () => {
+      (useIsMobile as vi.Mock).mockReturnValue(true); // Mobile
+      render(<VideoPlayerComponent movie={mockMovie} />);
+      expect(screen.queryByLabelText('Enter fullscreen')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Exit fullscreen')).not.toBeInTheDocument();
+    });
+
 
     it('hides control bar on mouse inactivity when playing, shows on activity', async () => {
         render(<VideoPlayerComponent movie={mockMovie} />);
@@ -484,12 +497,17 @@ describe('VideoPlayerComponent', () => {
     // Re-render or ensure component reacts to isMobile change (not easily done without re-render in test)
     // For simplicity, assume component correctly uses the new isMobile value if it were re-rendered.
     // We'll test that the fullscreen toggle is NOT called when a control button is clicked.
+    // Since VideoPlayerComponent re-renders on useIsMobile change, we can re-render it here.
+    const { rerender } = render(<VideoPlayerComponent movie={mockMovie} />);
+    rerender(<VideoPlayerComponent movie={mockMovie} />); // Rerender with isMobile=true active
+
     const requestFullscreenMock = mockPlayerContainerElement.requestFullscreen ||
                                   mockPlayerContainerElement.webkitRequestFullscreen ||
                                   mockPlayerContainerElement.mozRequestFullScreen ||
                                   mockPlayerContainerElement.msRequestFullscreen;
-
-    await user.click(playButtonInControls); // Click the control button again
+    
+    const playButtonInControlsMobile = screen.getByLabelText('Play'); // Get the button again after re-render
+    await user.click(playButtonInControlsMobile); // Click the control button again
      await waitFor(() => {
       expect(requestFullscreenMock).not.toHaveBeenCalled();
     });

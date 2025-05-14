@@ -131,7 +131,7 @@ export default function FeaturedMoviesSection({ movies, isLoading }: FeaturedMov
                   isMobile ? "pt-4 px-4 pb-12" : "p-6 md:p-10 lg:p-16" 
                 )}>
                 <h3 className={cn(
-                    "font-bold text-white line-clamp-2 shadow-text break-words overflow-hidden",
+                    "font-bold text-white shadow-text break-words overflow-hidden line-clamp-2", // Re-ordered line-clamp-2
                     isMobile ? "text-2xl mb-4" : "text-3xl md:text-4xl lg:text-5xl mb-3 md:mb-4" 
                   )}>
                   {movie.title}

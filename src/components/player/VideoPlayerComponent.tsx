@@ -1,7 +1,6 @@
 
 "use client";
 
-import type { Movie } from '@/types/movie';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -13,15 +12,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Play, Pause, Maximize, Minimize, VolumeX, Volume1, Volume2, Gauge, Check } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile'; 
-
-interface VideoPlayerProps {
-  movie: Movie;
-}
+import { ScreenMobile, VideoElementWithFullscreen, VideoPlayerProps } from './interfaces';
 
 const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 const formatTime = (timeInSeconds: number): string => {
-  if (isNaN(timeInSeconds) || timeInSeconds < 0) return '00:00';
   const minutes = Math.floor(timeInSeconds / 60);
   const seconds = Math.floor(timeInSeconds % 60);
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
@@ -116,7 +111,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     const video = videoRef.current; 
 
     const handleFullscreenChange = () => {
-      const doc = document as any;
+      const doc = document as Document & { webkitFullscreenElement?: Element; mozFullScreenElement?: Element; msFullscreenElement?: Element; };
       const isCurrentlyFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
       setIsFullscreen(isCurrentlyFullscreen);
       if (video) {
@@ -129,7 +124,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
     if (video) { // Check video exists before accessing its properties
-        const doc = document as any;
+        const doc = document as Document & { webkitFullscreenElement?: Element; mozFullScreenElement?: Element; msFullscreenElement?: Element; };
         const isCurrentlyFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
         if (isCurrentlyFullscreen) { // If already fullscreen on mount (e.g. browser refresh)
             setIsFullscreen(true);
@@ -167,9 +162,9 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   const toggleFullscreen = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!playerContainerRef.current) return;
-
-    const playerElement = playerContainerRef.current as any;
-    const video = videoRef.current;
+    
+    const playerElement = playerContainerRef.current as unknown as VideoElementWithFullscreen;
+    const video = videoRef.current as VideoElementWithFullscreen | null;
     if (video) video.controls = false; 
 
     try {
@@ -184,15 +179,17 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           await playerElement.msRequestFullscreen();
         }
 
-        if (typeof window !== 'undefined' && window.screen && window.screen.orientation && typeof window.screen.orientation.lock === 'function') {
+        // Attempt to lock screen orientation to landscape
+        if (typeof window !== 'undefined' && window.screen && window.screen.orientation && typeof (window.screen.orientation as ScreenMobile).lock === 'function') {
           try {
-            await window.screen.orientation.lock('landscape');
+            // 'landscape' includes 'landscape-primary' and 'landscape-secondary'
+            await (window.screen.orientation as ScreenMobile).lock!('landscape-primary');
           } catch (err) {
             console.warn("Screen orientation lock failed:", err);
           }
         }
       } else {
-        const doc = document as any;
+        const doc = document as Document & { webkitExitFullscreen?: () => Promise<void>; mozCancelFullScreen?: () => Promise<void>; msExitFullscreen?: () => Promise<void>; };
         if (doc.exitFullscreen) {
           await doc.exitFullscreen();
         } else if (doc.webkitExitFullscreen) { 
@@ -203,6 +200,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           await doc.msExitFullscreen();
         }
 
+        // Attempt to unlock screen orientation
         if (typeof window !== 'undefined' && window.screen && window.screen.orientation && typeof window.screen.orientation.unlock === 'function') {
           try {
             window.screen.orientation.unlock();

@@ -22,6 +22,7 @@ export default function FeaturedMoviesSection({ movies, isLoading }: FeaturedMov
     const isFirstSlide = currentIndex === 0;
     const newIndex = isFirstSlide ? movies.length - 1 : currentIndex - 1;
     setCurrentIndex(newIndex);
+ console.log('Current index:', newIndex);
   }, [currentIndex, movies.length]);
 
   const goToNext = useCallback(() => {
@@ -29,16 +30,20 @@ export default function FeaturedMoviesSection({ movies, isLoading }: FeaturedMov
     const isLastSlide = currentIndex === movies.length - 1;
     const newIndex = isLastSlide ? 0 : currentIndex + 1;
     setCurrentIndex(newIndex);
+ console.log('Current index:', newIndex);
   }, [currentIndex, movies.length]);
 
   const goToSlide = (slideIndex: number) => {
     setCurrentIndex(slideIndex);
+ console.log('Current index:', slideIndex);
   };
+ console.log('Current index:', currentIndex);
 
   useEffect(() => {
     if (movies.length > 1) { // Only auto-scroll if there's more than one movie
       const timer = setTimeout(() => {
         goToNext();
+        console.log('Timer fired, calling goToNext');
       }, 7000); // Change slide every 7 seconds
       return () => clearTimeout(timer);
     }

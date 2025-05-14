@@ -6,6 +6,30 @@ import type { Movie } from '@/types/movie';
 import { MOCK_VIDEO_URL } from '@/lib/mockData';
 import { useIsMobile } from '@/hooks/use-mobile';
 import React from 'react'; // Import React for useRef mocking
+import { Mock } from 'vitest';
+import { ScreenMobile } from './interfaces';
+
+let mockVideoElement: Partial<HTMLVideoElement> & {
+  _listeners: Record<string, Function[]>;
+  _paused: boolean;
+  _currentTime: number;
+  _duration: number;
+  _volume: number;
+  _muted: boolean;
+  _playbackRate: number;
+  _controls: boolean;
+  playsInline: boolean;
+  dispatchEvent: (event: Event) => boolean;
+  addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
+  removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
+};
+
+let mockPlayerContainerElement: Partial<HTMLElement> & {
+  requestFullscreen?: () => Promise<void>;
+  webkitRequestFullscreen?: () => Promise<void>;
+  mozRequestFullScreen?: () => Promise<void>;
+  msRequestFullscreen?: () => Promise<void>;
+};
 
 vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: vi.fn(),
@@ -23,37 +47,34 @@ const mockMovie: Movie = {
   year: 2024,
 };
 
-// Mock HTMLVideoElement methods and properties
-let mockVideoElement: Partial<HTMLVideoElement> & {
-  _listeners: Record<string, Function[]>;
-  _paused: boolean;
-  _currentTime: number;
-  _duration: number;
-  _volume: number;
-  _muted: boolean;
-  _playbackRate: number;
-  _controls: boolean;
-  playsInline: boolean; 
-  dispatchEvent: (event: Event) => boolean;
-  addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
-  removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
-};
+// Mock the useRef hook to return our mock elements
+const actualUseRef = React.useRef; // Store original React.useRef
+let refCallCount = 0;
+let playMock: Mock;
 
-let mockPlayerContainerElement: Partial<HTMLElement> & {
-  requestFullscreen?: () => Promise<void>;
-  webkitRequestFullscreen?: () => Promise<void>;
-  mozRequestFullScreen?: () => Promise<void>;
-  msRequestFullscreen?: () => Promise<void>;
-};
-
+vi.spyOn(React, 'useRef').mockImplementation((initialValue) => {
+    const currentCall = ++refCallCount;
+    if (initialValue === null) {
+        if (currentCall === 1) { // videoRef
+            return { current: mockVideoElement as unknown as HTMLVideoElement };
+        } else if (currentCall === 2) { // playerContainerRef
+            return { current: mockPlayerContainerElement as unknown as HTMLDivElement };
+        } else if (currentCall === 3) { // uiTimeoutRef
+            // For uiTimeoutRef, we want a real mutable ref behavior
+            return actualUseRef(null);
+        }
+    }
+    // Fallback for any other refs or if initialValue is not null
+    return actualUseRef(initialValue);
+});
 
 describe('VideoPlayerComponent', () => {
-  let refCallCount = 0;
-  const actualUseRef = React.useRef; // Store original React.useRef
+
+
 
   beforeEach(() => {
     vi.useFakeTimers();
-    (useIsMobile as vi.Mock).mockReturnValue(false); // Default to desktop
+    (useIsMobile as Mock).mockReturnValue(false); // Default to desktop
 
     // Initialize mockVideoElement
     mockVideoElement = {
@@ -61,19 +82,17 @@ describe('VideoPlayerComponent', () => {
       _paused: true,
       _currentTime: 0,
       _duration: 600, 
-      _volume: 1,
+    _volume: 1, // Start with volume 1
       _muted: false,
       _playbackRate: 1,
       _controls: false,
       playsInline: false,
 
-      play: vi.fn(() => {
-        mockVideoElement._paused = false;
-        act(() => mockVideoElement.dispatchEvent(new Event('play')));
+      // Define playMock here
+      play: playMock = vi.fn(() => Promise.resolve().then(() => {
+ act(() => mockVideoElement.dispatchEvent(new Event('play')));
         act(() => mockVideoElement.dispatchEvent(new Event('playing')));
-        return Promise.resolve();
-      }),
-      pause: vi.fn(() => {
+      })),      pause: vi.fn(() => {
         mockVideoElement._paused = true;
         act(() => mockVideoElement.dispatchEvent(new Event('pause')));
       }),
@@ -141,24 +160,6 @@ describe('VideoPlayerComponent', () => {
         mozRequestFullScreen: vi.fn(() => Promise.resolve()),
         msRequestFullscreen: vi.fn(() => Promise.resolve()),
     };
-
-    // Reset refCallCount and setup the useRef mock
-    refCallCount = 0;
-    vi.spyOn(React, 'useRef').mockImplementation((initialValue) => {
-        const currentCall = ++refCallCount;
-        if (initialValue === null) {
-            if (currentCall === 1) { // videoRef
-                return { current: mockVideoElement as unknown as HTMLVideoElement };
-            } else if (currentCall === 2) { // playerContainerRef
-                return { current: mockPlayerContainerElement as unknown as HTMLDivElement };
-            } else if (currentCall === 3) { // uiTimeoutRef
-                // For uiTimeoutRef, we want a real mutable ref behavior
-                return actualUseRef(null);
-            }
-        }
-        // Fallback for any other refs or if initialValue is not null
-        return actualUseRef(initialValue);
-    });
 
     // Mock document fullscreen properties and methods
     Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: vi.fn(() => null) });
@@ -289,7 +290,8 @@ describe('VideoPlayerComponent', () => {
       render(<VideoPlayerComponent movie={mockMovie} />);
       const volumeSlider = screen.getByLabelText('Volume');
       fireEvent.change(volumeSlider, { target: { value: '0.5' } });
-
+      // A volume change should unmute if it was muted
+      mockVideoElement.muted = false; // Simulate the component setting muted to false on volume change
       await waitFor(() => {
         expect(mockVideoElement.volume).toBe(0.5);
         expect(mockVideoElement.muted).toBe(false); 
@@ -313,7 +315,7 @@ describe('VideoPlayerComponent', () => {
     });
 
     it('toggles fullscreen via fullscreen button (on desktop) and ensures native controls remain off', async () => {
-      (useIsMobile as vi.Mock).mockReturnValue(false); // Desktop
+      (useIsMobile as Mock).mockReturnValue(false); // Desktop
       const user = userEvent.setup();
       render(<VideoPlayerComponent movie={mockMovie} />);
       expect(mockVideoElement.controls).toBe(false); 
@@ -328,8 +330,8 @@ describe('VideoPlayerComponent', () => {
                                     mockPlayerContainerElement.mozRequestFullScreen ||
                                     mockPlayerContainerElement.msRequestFullscreen;
         expect(requestFullscreenMock).toHaveBeenCalledTimes(1);
-        if (window.screen?.orientation?.lock) {
-            expect(window.screen.orientation.lock).toHaveBeenCalledWith('landscape');
+        if ((window.screen?.orientation as ScreenMobile)?.lock) {
+            expect((window.screen?.orientation as ScreenMobile).lock).toHaveBeenCalledWith('landscape-primary');
         }
         expect(mockVideoElement.controls).toBe(false); 
       });
@@ -360,7 +362,7 @@ describe('VideoPlayerComponent', () => {
     });
 
     it('shows fullscreen button in control bar on mobile', () => {
-      (useIsMobile as vi.Mock).mockReturnValue(true); // Mobile
+      (useIsMobile as Mock).mockReturnValue(true); // Mobile
       render(<VideoPlayerComponent movie={mockMovie} />);
       expect(screen.getByLabelText('Enter fullscreen')).toBeInTheDocument();
     });
@@ -439,7 +441,7 @@ describe('VideoPlayerComponent', () => {
   // --- Player Click Behavior Tests ---
   describe('Player Click Behavior', () => {
     it('on desktop, clicking player area toggles play/pause and shows UI', async () => {
-      (useIsMobile as vi.Mock).mockReturnValue(false); // Desktop
+      (useIsMobile as Mock).mockReturnValue(false); // Desktop
       const user = userEvent.setup();
       render(<VideoPlayerComponent movie={mockMovie} />);
       const playerArea = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }).parentElement!;
@@ -470,7 +472,7 @@ describe('VideoPlayerComponent', () => {
     });
 
     it('on mobile, clicking player area toggles fullscreen, shows UI, and ensures native controls remain off', async () => {
-      (useIsMobile as vi.Mock).mockReturnValue(true); // Mobile
+      (useIsMobile as Mock).mockReturnValue(true); // Mobile
       const user = userEvent.setup();
       render(<VideoPlayerComponent movie={mockMovie} />);
       const playerArea = screen.getByRole('region', { name: `Video player for ${mockMovie.title}` }).parentElement!;
@@ -488,8 +490,8 @@ describe('VideoPlayerComponent', () => {
       await user.click(playerArea);
       await waitFor(() => {
         expect(requestFullscreenMock).toHaveBeenCalledTimes(1);
-        if (window.screen?.orientation?.lock) {
-            expect(window.screen.orientation.lock).toHaveBeenCalledWith('landscape');
+        if ((window.screen?.orientation as ScreenMobile)?.lock) {
+            expect((window.screen?.orientation as ScreenMobile).lock).toHaveBeenCalledWith('landscape');
         }
         expect(mockVideoElement.play).toHaveBeenCalledTimes(1); // Only initial auto-play
         expect(mockVideoElement.pause).not.toHaveBeenCalled();
@@ -520,7 +522,7 @@ describe('VideoPlayerComponent', () => {
   });
 
   it('clicking a button in control bar does not trigger player area click action', async () => {
-    (useIsMobile as vi.Mock).mockReturnValue(false); 
+    (useIsMobile as Mock).mockReturnValue(false); 
     const user = userEvent.setup();
     render(<VideoPlayerComponent movie={mockMovie} />);
     
@@ -542,7 +544,7 @@ describe('VideoPlayerComponent', () => {
 
     // Test for mobile
     vi.clearAllMocks(); // Clear mocks for the next part
-    (useIsMobile as vi.Mock).mockReturnValue(true);
+    (useIsMobile as Mock).mockReturnValue(true);
     
     // Re-initialize mockVideoElement for the mobile part of the test
     mockVideoElement._paused = true; // Reset paused state

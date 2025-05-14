@@ -1,7 +1,7 @@
 
 import { db, isFirebaseConfigured } from './config';
 import type { Movie } from '@/types/movie';
-import { mockMovies, MOCK_VIDEO_URL } from '../mockData';
+import { mockMovies, MOCK_VIDEO_URL, type MockDocumentSnapshot } from '../mockData';
 import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, type FieldPath } from 'firebase/firestore';
 
 const MOVIES_COLLECTION = 'movies';
@@ -27,14 +27,14 @@ interface PaginatedMoviesResult {
   lastVisible: DocumentSnapshot | null;
 }
 
-export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot | null = null): Promise<PaginatedMoviesResult> => {
+export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot | MockDocumentSnapshot | null = null): Promise<PaginatedMoviesResult> => {
   if (!isFirebaseConfigured || !db) {
     console.warn("Firebase not configured. Returning mock movies.");
 
     let startIndex = 0;
-    if (lastDoc && (lastDoc as any).mockId) {
-      const lastMockId = (lastDoc as any).mockId;
-      const lastIndex = mockMovies.findIndex(m => m.id === lastMockId);
+    if (lastDoc && 'mockId' in lastDoc && typeof lastDoc.mockId === 'string') {
+      const lastMockId = lastDoc.mockId;
+      const lastIndex = mockMovies.findIndex(m => m.id === lastMockId);      
       
       if (lastIndex !== -1) {
         startIndex = lastIndex + 1;
@@ -55,7 +55,7 @@ export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot
     const paginatedMockMovies = mockMovies.slice(startIndex, startIndex + pageSize);
     
     let newMockLastVisible: DocumentSnapshot | null = null;
-    // Check if there are more movies *after* the current batch
+    // Check if there are more movies *after* the current batch    
     if (startIndex + paginatedMockMovies.length < mockMovies.length) {
         // Create a mock DocumentSnapshot-like object for pagination
         const lastFetchedMovieInBatch = paginatedMockMovies[paginatedMockMovies.length - 1];
@@ -67,12 +67,12 @@ export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot
             get: (fieldPath: string | number | FieldPath) => {
                 const itemData = mockMovies.find(m => m.id === lastFetchedMovieInBatch.id);
                 if (itemData && typeof fieldPath === 'string') {
-                    return (itemData as any)[fieldPath];
+                    return (itemData as any)[fieldPath]; // Use 'any' here if accessing properties dynamically is unavoidable
                 }
                 return undefined;
             },
             ref: { path: `${MOVIES_COLLECTION}/mock-last-visible-${lastFetchedMovieInBatch.id}` } as any,
-        } as unknown as DocumentSnapshot;
+        } as MockDocumentSnapshot as unknown as DocumentSnapshot; // Cast to MockDocumentSnapshot first
     }
     
     return { movies: paginatedMockMovies, lastVisible: newMockLastVisible };
@@ -111,7 +111,7 @@ export const getMovieById = async (id: string): Promise<Movie | null> => {
   try {
     const docRef = doc(db, MOVIES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
-
+    
     if (docSnap.exists()) {
       return mapDocToMovie(docSnap);
     } else {

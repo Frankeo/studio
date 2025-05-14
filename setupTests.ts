@@ -1,6 +1,7 @@
 
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
+import React from 'react'; // Import React
 
 // Mock next/image
 vi.mock('next/image', () => ({
@@ -8,8 +9,8 @@ vi.mock('next/image', () => ({
   default: (props: any) => {
     // eslint-disable-next-line jsx-a11y/alt-text, @next/next/no-img-element
     const { priority, ...rest } = props; // Destructure and ignore priority
-    return <img {...rest} />;
-  },
+    return React.createElement('img', rest); // Use React.createElement
+q  },
 }));
 
 // Mock next/navigation

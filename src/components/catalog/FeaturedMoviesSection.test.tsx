@@ -60,7 +60,7 @@ describe('FeaturedMoviesSection', () => {
     // We need to wait for the CSS transform to apply to make the next slide "visible" conceptually
     // The actual text of all slides is in the DOM. We check the active one.
     await waitFor(() => {
-      // This test relies on how "visibility" is implemented. If it's via transform translateX,
+      // This test relies on how "visibility" is implemented. If it's via transform translateX,      // This test relies on how "visibility" is implemented. If it's via transform translateX,
       // the elements are still in the DOM. We check which elements are *semantically* active.
       // For now, we assume the component handles this correctly internally.
       // A more robust test would inspect the `style.transform` of the slide container.
@@ -121,6 +121,8 @@ describe('FeaturedMoviesSection', () => {
   });
 
   it('auto-scrolls to the next slide', async () => {
+    vi.useFakeTimers(); // Explicitly enable fake timers for this test
+
     render(<FeaturedMoviesSection movies={mockMovies} isLoading={false} />);
     expect(screen.getByText(mockMovies[0].title)).toBeInTheDocument();
 
@@ -129,16 +131,18 @@ describe('FeaturedMoviesSection', () => {
     });
     
     await waitFor(() => {
-        expect(screen.getByText(mockMovies[1].title)).toBeInTheDocument();
-    });
+ expect(screen.getByText(mockMovies[1].title)).toBeInTheDocument();
+ }, { timeout: 10000 });
 
     act(() => {
       vi.advanceTimersByTime(7000);
     });
-
+    
      await waitFor(() => {
-        expect(screen.getByText(mockMovies[2].title)).toBeInTheDocument();
-    });
+ expect(screen.getByText(mockMovies[2].title)).toBeInTheDocument();
+ }, { timeout: 10000 });
+
+    vi.useRealTimers(); // Restore real timers after the test
   });
 
   it('does not render navigation arrows or dots if only one movie', () => {

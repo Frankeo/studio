@@ -5,7 +5,9 @@ import {
   createUserWithEmailAndPassword, 
   GoogleAuthProvider, 
   signInWithPopup,
-  type UserCredential
+  updateProfile, // Import updateProfile
+  type UserCredential,
+  type User // Import User type
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from './config';
 import { MOCK_USER_CREDENTIALS, mockUser } from '../mockData';
@@ -50,4 +52,25 @@ export const fbSignOutUser = async (): Promise<void> => {
     return Promise.resolve();
   }
   return signOut(auth);
+};
+
+// Update User Profile
+export const fbUpdateUserProfile = async (
+  currentUser: User, 
+  updates: { displayName?: string | null; photoURL?: string | null }
+): Promise<void> => {
+  if (!isFirebaseConfigured || !auth) {
+    // Mock update: In a real mock scenario, you might update mockUser or a similar state.
+    // For this example, we'll assume the AuthContext will handle visual updates if needed.
+    if (updates.displayName !== undefined) mockUser.displayName = updates.displayName;
+    if (updates.photoURL !== undefined) mockUser.photoURL = updates.photoURL;
+    // Note: This mock update only affects the mockUser object in memory,
+    // and doesn't persist or trigger onAuthStateChanged.
+    // The AuthContext's setUser directly might be needed for UI refresh in mock mode.
+    return Promise.resolve();
+  }
+  if (!currentUser) {
+    throw new Error("No user is currently signed in to update.");
+  }
+  return updateProfile(currentUser, updates);
 };

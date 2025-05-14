@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Clapperboard, LogOut, UserCircle } from 'lucide-react';
+import { Clapperboard, LogOut, UserCircle, User as UserIcon } from 'lucide-react'; // Added UserIcon
 import { useAuth } from '@/context/AuthContext'; // Use AuthContext
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -68,6 +68,13 @@ export default function Header() {
                     {user.displayName && user.email && <p className="text-xs leading-none text-muted-foreground">{user.email}</p>}
                   </div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link href="/profile">
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />

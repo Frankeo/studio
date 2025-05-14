@@ -60,6 +60,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
     video.controls = false;
     video.playsInline = true;
+    (video as any).webkitPlaysInline = true; // For iOS Safari compatibility
 
     const handlePlay = () => { setIsPaused(false); setShowPlayerUI(true); startUiHideTimer(); };
     const handlePause = () => { setIsPaused(true); setShowPlayerUI(true); clearUiTimeout(); };
@@ -210,10 +211,9 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     if (video) video.controls = false;
   };
 
-  const handlePlayerClick = (e: React.MouseEvent) => {
+ const handlePlayerClick = (e: React.MouseEvent) => {
     const targetElement = e.target as HTMLElement;
     // Prevent player click if it originated from a button, slider, menu item, or the controls bar itself.
-    // The .group class was added to handle slider thumb clicks more reliably.
     if (targetElement.closest('button, [role="slider"], [role="menuitem"], [data-testid="video-controls-bar"], .group')) {
       return;
     }
@@ -221,13 +221,13 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     const video = videoRef.current;
     if (!video) return;
 
-    video.controls = false; 
+    video.controls = false;
     setShowPlayerUI(true); // Always show UI on a valid screen tap
 
     if (video.paused || video.ended) {
-      video.play(); // Play if paused or ended. 'play' event handler manages UI timer.
+      video.play(); 
     } else {
-      video.pause(); // Pause if playing. 'pause' event handler manages UI timer.
+      video.pause();
     }
   };
 
@@ -309,6 +309,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         aria-label={`Video player for ${movie.title}`}
         data-ai-hint="movie video"
         playsInline // Essential for custom controls on iOS
+        webkit-playsinline="true" // Older WebKit prefix for iOS, true as string for HTML attribute
         onClick={(e) => e.stopPropagation()} // Prevent video element's default click handling if any
       >
         Your browser does not support the video tag.
@@ -377,8 +378,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           onValueChange={(value) => handleSeek(value[0])}
           className="w-full h-2 mb-1 md:mb-2 group 
                      [&>span:first-child]:h-1 [&>span:first-child>span]:h-1 
-                     [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2
-                     group-hover:[&>span:last-child]:scale-125"
+                     [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2"
           aria-label="Video progress"
         />
         <div className="flex items-center justify-between text-white">
@@ -398,8 +398,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
                 step={0.01}
                 onValueChange={(value) => handleVolumeSliderChange(value[0])}
                 className="[&>span:first-child]:h-1 [&>span:first-child>span]:h-1 
-                           [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2
-                           group-hover:[&>span:last-child]:scale-125"
+                           [&>span:last-child]:h-3 [&>span:last-child]:w-3 [&>span:last-child]:border-2"
                 aria-label="Volume"
               />
             </div>
@@ -435,3 +434,4 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     </div>
   );
 }
+

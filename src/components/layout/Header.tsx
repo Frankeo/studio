@@ -27,10 +27,10 @@ export default function Header() {
       await signOut();
       router.push('/login');
       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Logout Failed',
-        description: error.message || 'An unexpected error occurred during logout.',
+        description: (error as Error).message || 'An unexpected error occurred during logout.',
         variant: 'destructive',
       });
     }

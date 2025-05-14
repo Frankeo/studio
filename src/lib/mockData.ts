@@ -1,5 +1,5 @@
 
-import { ProviderId, type User } from 'firebase/auth';
+import { type User } from 'firebase/auth';
 import type { Movie } from '@/types/movie';
 
 export const MOCK_VIDEO_URL = "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4";
@@ -34,7 +34,7 @@ export const mockUser: User = {
   refreshToken: 'mock-refresh-token',
   tenantId: null,
   delete: async () => { console.warn('Mock user delete called'); },
-  getIdToken: async (_forceRefresh?: boolean) => 'mock-id-token',
+  getIdToken: async () => 'mock-id-token',
   getIdTokenResult: async () => ({
     token: 'mock-id-token',
     expirationTime: new Date(Date.now() + 3600 * 1000).toISOString(),

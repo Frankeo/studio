@@ -1,6 +1,5 @@
 import Header from '@/components/layout/Header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft } from 'lucide-react';
 
 export default function PlayerLoading() {
   return (

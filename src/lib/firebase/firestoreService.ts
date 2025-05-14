@@ -67,11 +67,12 @@ export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot
             get: (fieldPath: string | number | FieldPath) => {
                 const itemData = mockMovies.find(m => m.id === lastFetchedMovieInBatch.id);
                 if (itemData && typeof fieldPath === 'string') {
-                    return (itemData as any)[fieldPath]; // Use 'any' here if accessing properties dynamically is unavoidable
+                  const prop = fieldPath as keyof typeof itemData;
+                  return itemData[prop];
                 }
                 return undefined;
             },
-            ref: { path: `${MOVIES_COLLECTION}/mock-last-visible-${lastFetchedMovieInBatch.id}` } as any,
+            ref: { path: `${MOVIES_COLLECTION}/mock-last-visible-${lastFetchedMovieInBatch.id}` },
         } as unknown as DocumentSnapshot; // Cast to MockDocumentSnapshot first
     }
     

@@ -128,11 +128,11 @@ export default function FeaturedMoviesSection({ movies, isLoading }: FeaturedMov
               />
               <div className={cn(
                   "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/40 to-transparent",
-                  isMobile ? "pt-4 px-4 pb-12" : "p-6 md:p-10 lg:p-16" // Adjusted mobile padding
+                  isMobile ? "pt-4 px-4 pb-12" : "p-6 md:p-10 lg:p-16" 
                 )}>
                 <h3 className={cn(
-                    "font-bold text-white mb-3 md:mb-4 line-clamp-2 shadow-text",
-                    isMobile ? "text-2xl" : "text-3xl md:text-4xl lg:text-5xl"
+                    "font-bold text-white line-clamp-2 shadow-text break-words", // Added break-words
+                    isMobile ? "text-2xl mb-4" : "text-3xl md:text-4xl lg:text-5xl mb-3 md:mb-4" // Increased mb for mobile
                   )}>
                   {movie.title}
                 </h3>
@@ -196,9 +196,9 @@ export default function FeaturedMoviesSection({ movies, isLoading }: FeaturedMov
         {/* Dot Indicators */}
         {movies.length > 1 && (
           <div className="absolute bottom-4 md:bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-2">
-            {movies.map((movie, slideIndex) => ( // Use movie.id for key if slideIndex is not stable
+            {movies.map((movie, slideIndex) => ( 
               <button
-                key={`dot-${movie.id}-${slideIndex}`} // More robust key
+                key={`dot-${movie.id}-${slideIndex}`} 
                 onClick={() => goToSlide(slideIndex)}
                 className={`h-2.5 w-2.5 md:h-3 md:w-3 rounded-full transition-all duration-300 ease-in-out ${
                   currentIndex === slideIndex ? 'bg-primary scale-125' : 'bg-white/40 hover:bg-white/70'

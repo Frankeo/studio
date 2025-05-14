@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Pause, Maximize, Minimize, VolumeX, Volume1, Volume2, Gauge, Check } from 'lucide-react';
+import { Play, Pause, Maximize, Minimize, VolumeX, Volume1, Volume2, Gauge, Check, Clapperboard } from 'lucide-react'; // Added Clapperboard
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { ScreenMobile, VideoElementWithFullscreen, VideoPlayerProps } from './interfaces';
 
@@ -35,6 +35,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [isVideoBuffering, setIsVideoBuffering] = useState(true);
 
   const isMobile = useIsMobile();
 
@@ -60,22 +61,30 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
     video.controls = false;
     video.playsInline = true;
-    (video as any).webkitPlaysInline = true; // For iOS Safari compatibility
+    (video as any).webkitPlaysInline = true; 
 
-    const handlePlay = () => { setIsPaused(false); setShowPlayerUI(true); startUiHideTimer(); };
+    const handlePlay = () => { setIsPaused(false); setShowPlayerUI(true); startUiHideTimer(); setIsVideoBuffering(false); };
     const handlePause = () => { setIsPaused(true); setShowPlayerUI(true); clearUiTimeout(); };
-    const handleEnded = () => { setIsPaused(true); setShowPlayerUI(true); clearUiTimeout(); if (video) setCurrentTime(video.duration); };
+    const handleEnded = () => { setIsPaused(true); setShowPlayerUI(true); clearUiTimeout(); if (video) setCurrentTime(video.duration); setIsVideoBuffering(false);};
     const handleTimeUpdate = () => { if (video) setCurrentTime(video.currentTime); };
     const handleLoadedMetadata = () => { if (video) setDuration(video.duration); };
     const handleVolumeChange = () => { if (video) { setVolume(video.volume); setIsMuted(video.muted); }};
+    
+    const handleCanPlay = () => setIsVideoBuffering(false);
+    const handleWaiting = () => setIsVideoBuffering(true);
+    const handleError = () => setIsVideoBuffering(false); // Stop loader on error
 
     video.addEventListener('play', handlePlay);
-    video.addEventListener('playing', handlePlay);
+    video.addEventListener('playing', handlePlay); // Also sets buffering to false
     video.addEventListener('pause', handlePause);
     video.addEventListener('ended', handleEnded);
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('volumechange', handleVolumeChange);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('error', handleError);
+
 
     setDuration(video.duration || 0);
     setCurrentTime(video.currentTime || 0);
@@ -83,10 +92,21 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     setIsMuted(video.muted);
     setPlaybackRate(video.playbackRate);
     setIsPaused(video.paused);
+    if (video.readyState >= video.HAVE_ENOUGH_DATA) {
+        setIsVideoBuffering(false);
+    }
+
 
     video.play().catch(() => {
       setIsPaused(true);
       setShowPlayerUI(true);
+      // If play fails (e.g. browser policy), it might not be buffering but just paused.
+      // Check readyState again.
+      if (video.readyState < video.HAVE_ENOUGH_DATA) {
+        setIsVideoBuffering(true);
+      } else {
+        setIsVideoBuffering(false);
+      }
     });
 
 
@@ -98,6 +118,9 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('volumechange', handleVolumeChange);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('error', handleError);
       clearUiTimeout();
     };
   }, [movie.id, startUiHideTimer, clearUiTimeout]);
@@ -112,7 +135,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         doc.webkitFullscreenElement ||
         doc.mozFullScreenElement ||
         doc.msFullscreenElement ||
-        (video && video.webkitSupportsFullscreen && video.webkitDisplayingFullscreen) // iOS specific for video element
+        (video && video.webkitSupportsFullscreen && video.webkitDisplayingFullscreen) 
       );
       setIsFullscreen(isCurrentlyFullscreen);
       if (video) {
@@ -120,10 +143,10 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange); // For Safari/Webkit
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange); 
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-    // Specific to video element fullscreen on iOS
+    
     if (video) {
         video.addEventListener('webkitbeginfullscreen', () => setIsFullscreen(true));
         video.addEventListener('webkitendfullscreen', () => setIsFullscreen(false));
@@ -173,7 +196,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
   const toggleFullscreen = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const video = videoRef.current;
-    const playerElement = playerContainerRef.current as VideoElementWithFullscreen | null; // Can be null
+    const playerElement = playerContainerRef.current as VideoElementWithFullscreen | null; 
 
     if (!video && !playerElement) return;
 
@@ -187,10 +210,10 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
     try {
       if (!isFullscreen) {
-        // Try iOS-specific video element fullscreen first
+        
         if (video && typeof video.webkitEnterFullscreen === 'function') {
           video.webkitEnterFullscreen();
-        } else if (playerElement) { // Fallback to container fullscreen for other platforms
+        } else if (playerElement) { 
           if (playerElement.requestFullscreen) {
             await playerElement.requestFullscreen();
           } else if (playerElement.webkitRequestFullscreen) {
@@ -210,10 +233,10 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
           }
         }
       } else {
-        // Try iOS-specific video element exit fullscreen first
+        
         if (video && typeof video.webkitExitFullscreen === 'function') {
           video.webkitExitFullscreen();
-        } else if (doc.exitFullscreen) { // Standard exit
+        } else if (doc.exitFullscreen) { 
           await doc.exitFullscreen();
         } else if (doc.webkitExitFullscreen) {
           await doc.webkitExitFullscreen();
@@ -239,16 +262,17 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
 
  const handlePlayerClick = (e: React.MouseEvent) => {
     const targetElement = e.target as HTMLElement;
+    // Do not toggle play/pause if the click is on a button, slider, or any interactive element within the controls.
     if (targetElement.closest('button, [role="slider"], [role="menuitem"], [data-testid="video-controls-bar"], .group')) {
       return;
     }
-
+  
     const video = videoRef.current;
     if (!video) return;
-
-    video.controls = false;
-    setShowPlayerUI(true);
-
+  
+    video.controls = false; // Ensure custom controls context
+    setShowPlayerUI(true); // Always show UI on tap
+  
     if (video.paused || video.ended) {
       video.play();
     } else {
@@ -295,7 +319,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
       videoRef.current.muted = !videoRef.current.muted;
       setIsMuted(videoRef.current.muted);
       if (!videoRef.current.muted && videoRef.current.volume === 0) {
-        videoRef.current.volume = 0.5;
+        videoRef.current.volume = 0.5; // Restore to a sensible volume
         setVolume(0.5);
       }
     }
@@ -340,7 +364,13 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         Your browser does not support the video tag.
       </video>
 
-      {isPaused && showPlayerUI && (
+      {isVideoBuffering && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-20 pointer-events-none">
+          <Clapperboard className="h-16 w-16 text-primary animate-pulse" />
+        </div>
+      )}
+
+      {isPaused && showPlayerUI && !isVideoBuffering && (
         <div
           className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-20"
           onClick={(e) => e.stopPropagation()} 
@@ -367,7 +397,7 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
         </div>
       )}
 
-      {!isPaused && showPlayerUI && (
+      {!isPaused && showPlayerUI && !isVideoBuffering && (
         <div
           className="absolute top-0 left-0 h-full w-full max-w-xs sm:max-w-sm md:max-w-md bg-gradient-to-r from-black/70 via-black/50 to-transparent p-4 md:p-6 flex flex-col justify-start text-white transition-opacity duration-300 ease-in-out pointer-events-none z-10"
           style={{ opacity: showPlayerUI ? 1 : 0 }}
@@ -452,3 +482,4 @@ export default function VideoPlayerComponent({ movie }: VideoPlayerProps) {
     </div>
   );
 }
+

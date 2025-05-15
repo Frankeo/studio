@@ -10,7 +10,7 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut 
 } from 'firebase/auth';
-import { auth, isFirebaseConfigured } from '@/lib/firebase/config';
+import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config'; // Added db here
 import { mockUser, MOCK_USER_CREDENTIALS, mockUserProfileData } from '@/lib/mockData';
 import { fbUpdateUserProfile } from '@/lib/firebase/authService'; 
 import { getUserProfileFromFirestore } from '@/lib/firebase/firestoreService';

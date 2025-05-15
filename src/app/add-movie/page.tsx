@@ -14,26 +14,38 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Clapperboard, Loader2, PlusCircle, UploadCloud } from 'lucide-react';
+import { ArrowLeft, Clapperboard, Loader2, PlusCircle, UploadCloud, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { addMovieToFirestore } from '@/lib/firebase/firestoreService';
-import { uploadVideoToFirebaseStorage } from '@/lib/firebase/storageService'; // Import storage service
+import { uploadVideoToFirebaseStorage, uploadImageToFirebaseStorage } from '@/lib/firebase/storageService';
 import GlobalLoader from '@/components/layout/GlobalLoader';
 import type { Movie } from '@/types/movie';
 
-const MAX_FILE_SIZE_MB = 100; // Example: 100MB
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const MAX_VIDEO_SIZE_MB = 100;
+const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
 const ACCEPTED_VIDEO_TYPES = ['video/mp4'];
+
+const MAX_POSTER_SIZE_MB = 5;
+const MAX_POSTER_SIZE_BYTES = MAX_POSTER_SIZE_MB * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const movieSchema = z.object({
   title: z.string().min(1, { message: "Title is required." }).max(100, { message: "Title must be 100 characters or less." }),
   description: z.string().min(1, { message: "Description is required." }).max(1000, { message: "Description must be 1000 characters or less." }),
-  posterUrl: z.string().url({ message: "Please enter a valid URL for the poster." }).optional().or(z.literal('')),
-  videoFile: z // ADDED for file upload
+  posterFile: z
+    .custom<FileList>((val) => val === undefined || val instanceof FileList, "Poster file input is invalid.")
+    .optional()
+    .refine((files) => !files || files.length <= 1, "Please upload only one poster image.")
+    .refine((files) => !files || files?.[0]?.size <= MAX_POSTER_SIZE_BYTES, `Max poster size is ${MAX_POSTER_SIZE_MB}MB.`)
+    .refine(
+      (files) => !files || (files?.[0] && ACCEPTED_IMAGE_TYPES.includes(files[0].type)),
+      `Only ${ACCEPTED_IMAGE_TYPES.join(', ')} formats are supported for posters.`
+    ),
+  videoFile: z
     .custom<FileList>((val) => val instanceof FileList, "Video file input is required.")
     .refine((files) => files && files.length > 0, "A video file is required.")
     .refine((files) => files && files.length === 1, "Please upload only one video file.")
-    .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE_BYTES, `Max file size is ${MAX_FILE_SIZE_MB}MB.`)
+    .refine((files) => files?.[0]?.size <= MAX_VIDEO_SIZE_BYTES, `Max video file size is ${MAX_VIDEO_SIZE_MB}MB.`)
     .refine(
       (files) => files?.[0] && ACCEPTED_VIDEO_TYPES.includes(files[0].type),
       "Only .mp4 video format is supported."
@@ -51,7 +63,9 @@ export default function AddMoviePage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null); // For future progress bar
+  const [videoUploadProgress, setVideoUploadProgress] = useState<number | null>(null);
+  const [posterUploadProgress, setPosterUploadProgress] = useState<number | null>(null);
+
 
   const {
     register,
@@ -63,8 +77,8 @@ export default function AddMoviePage() {
     defaultValues: {
         title: '',
         description: '',
-        posterUrl: '',
-        videoFile: undefined, // Updated for FileList
+        posterFile: undefined,
+        videoFile: undefined,
         genre: '',
         duration: '',
         rating: 0,
@@ -97,10 +111,21 @@ export default function AddMoviePage() {
 
   const onSubmit: SubmitHandler<MovieFormInputs> = async (data) => {
     setIsSubmitting(true);
-    setUploadProgress(null); // Reset progress
+    setVideoUploadProgress(null);
+    setPosterUploadProgress(null);
 
     try {
-      const videoToUpload = data.videoFile[0]; // Get the File object
+      let uploadedPosterUrl = `https://placehold.co/300x450.png`; // Default placeholder
+      const posterToUpload = data.posterFile?.[0];
+
+      if (posterToUpload) {
+        toast({ title: 'Uploading Poster...', description: 'Please wait while the poster is being uploaded.' });
+        setPosterUploadProgress(0);
+        uploadedPosterUrl = await uploadImageToFirebaseStorage(posterToUpload, 'posters');
+        setPosterUploadProgress(100);
+      }
+      
+      const videoToUpload = data.videoFile[0];
       let uploadedVideoUrl = '';
 
       if (!videoToUpload) {
@@ -109,21 +134,16 @@ export default function AddMoviePage() {
          return;
       }
       
-      // Simulate upload progress or use actual progress if library supports it
       toast({ title: 'Uploading Video...', description: 'Please wait while the video is being uploaded.' });
-      // For actual progress, you'd use the onProgress callback from Firebase upload task
-      // For now, we'll just set a generic "uploading" state
-      setUploadProgress(0); // Indicate start of upload
-
+      setVideoUploadProgress(0); 
       uploadedVideoUrl = await uploadVideoToFirebaseStorage(videoToUpload, 'videos');
-      
-      setUploadProgress(100); // Indicate completion
+      setVideoUploadProgress(100);
 
       const movieData: Omit<Movie, 'id'> = {
         title: data.title,
         description: data.description,
-        posterUrl: data.posterUrl || `https://placehold.co/300x450.png`,
-        videoUrl: uploadedVideoUrl, // Use the URL from storage
+        posterUrl: uploadedPosterUrl,
+        videoUrl: uploadedVideoUrl,
         genre: data.genre,
         duration: data.duration,
         rating: data.rating,
@@ -141,7 +161,8 @@ export default function AddMoviePage() {
       });
     } finally {
       setIsSubmitting(false);
-      setUploadProgress(null);
+      setVideoUploadProgress(null);
+      setPosterUploadProgress(null);
     }
   };
 
@@ -163,6 +184,14 @@ export default function AddMoviePage() {
       </div>
     );
   }
+
+  const fileInputClasses = `
+    file:mr-4 file:py-2 file:px-4
+    file:rounded-full file:border-0
+    file:text-sm file:font-semibold
+    file:bg-primary/10 file:text-primary
+    hover:file:bg-primary/20
+  `;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -200,13 +229,23 @@ export default function AddMoviePage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label htmlFor="posterUrl">Poster URL (Optional)</Label>
-                  <Input id="posterUrl" type="url" {...register('posterUrl')} placeholder="https://example.com/poster.jpg" disabled={isSubmitting} className={errors.posterUrl ? 'border-destructive' : ''} />
-                  {errors.posterUrl && <p className="text-sm text-destructive mt-1">{errors.posterUrl.message}</p>}
+                  <Label htmlFor="posterFile">Poster Image (Optional, Max {MAX_POSTER_SIZE_MB}MB)</Label>
+                  <div className="flex items-center space-x-2">
+                    <ImageIcon className={`h-5 w-5 ${errors.posterFile ? 'text-destructive' : 'text-muted-foreground'}`} />
+                    <Input 
+                      id="posterFile" 
+                      type="file" 
+                      accept={ACCEPTED_IMAGE_TYPES.join(',')} 
+                      {...register('posterFile')} 
+                      disabled={isSubmitting} 
+                      className={`${errors.posterFile ? 'border-destructive' : ''} ${fileInputClasses}`}
+                    />
+                  </div>
+                  {errors.posterFile && <p className="text-sm text-destructive mt-1">{errors.posterFile.message}</p>}
                   <p className="text-xs text-muted-foreground mt-1">If left blank, a placeholder image will be used.</p>
                 </div>
                 <div>
-                  <Label htmlFor="videoFile">Video File (MP4, Max {MAX_FILE_SIZE_MB}MB)</Label>
+                  <Label htmlFor="videoFile">Video File (MP4, Max {MAX_VIDEO_SIZE_MB}MB)</Label>
                   <div className="flex items-center space-x-2">
                     <UploadCloud className={`h-5 w-5 ${errors.videoFile ? 'text-destructive' : 'text-muted-foreground'}`} />
                     <Input 
@@ -215,14 +254,7 @@ export default function AddMoviePage() {
                       accept="video/mp4" 
                       {...register('videoFile')} 
                       disabled={isSubmitting} 
-                      className={`
-                        ${errors.videoFile ? 'border-destructive' : ''}
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-full file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-primary/10 file:text-primary
-                        hover:file:bg-primary/20
-                      `}
+                      className={`${errors.videoFile ? 'border-destructive' : ''} ${fileInputClasses}`}
                     />
                   </div>
                   {errors.videoFile && <p className="text-sm text-destructive mt-1">{errors.videoFile.message}</p>}
@@ -255,26 +287,54 @@ export default function AddMoviePage() {
                 </div>
               </div>
               
-              {isSubmitting && uploadProgress !== null && (
-                <div className="w-full bg-muted rounded-full h-2.5 dark:bg-gray-700 my-2">
-                  <div 
-                    className="bg-primary h-2.5 rounded-full transition-all duration-300 ease-out" 
-                    style={{ width: `${uploadProgress}%` }}
-                    role="progressbar"
-                    aria-valuenow={uploadProgress}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                  ></div>
-                   <p className="text-xs text-center text-muted-foreground mt-1">
-                    {uploadProgress < 100 ? `Uploading... ${uploadProgress}%` : 'Processing...'}
-                  </p>
+              {isSubmitting && (posterUploadProgress !== null || videoUploadProgress !== null) && (
+                <div className="space-y-2">
+                  {posterUploadProgress !== null && (
+                    <div>
+                      <Label className="text-xs">Poster Upload:</Label>
+                      <div className="w-full bg-muted rounded-full h-2.5 dark:bg-gray-700 my-1">
+                        <div 
+                          className="bg-primary/70 h-2.5 rounded-full transition-all duration-300 ease-out" 
+                          style={{ width: `${posterUploadProgress}%` }}
+                          role="progressbar"
+                          aria-valuenow={posterUploadProgress}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-center text-muted-foreground">
+                        {posterUploadProgress < 100 ? `Uploading poster... ${posterUploadProgress}%` : 'Poster uploaded!'}
+                      </p>
+                    </div>
+                  )}
+                  {videoUploadProgress !== null && (
+                     <div>
+                      <Label className="text-xs">Video Upload:</Label>
+                      <div className="w-full bg-muted rounded-full h-2.5 dark:bg-gray-700 my-1">
+                        <div 
+                          className="bg-primary h-2.5 rounded-full transition-all duration-300 ease-out" 
+                          style={{ width: `${videoUploadProgress}%` }}
+                          role="progressbar"
+                          aria-valuenow={videoUploadProgress}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                        ></div>
+                      </div>
+                       <p className="text-xs text-center text-muted-foreground">
+                        {videoUploadProgress < 100 ? `Uploading video... ${videoUploadProgress}%` : 'Video uploaded! Processing movie...'}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
 
               <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                {isSubmitting ? (uploadProgress !== null && uploadProgress < 100 ? 'Uploading...' : 'Adding Movie...') : 'Add Movie'}
+                {isSubmitting ? 
+                  (posterUploadProgress !== null && posterUploadProgress < 100 ? 'Uploading Poster...' : 
+                  (videoUploadProgress !== null && videoUploadProgress < 100 ? 'Uploading Video...' : 'Adding Movie...')) 
+                  : 'Add Movie'}
               </Button>
             </form>
           </CardContent>

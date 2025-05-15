@@ -39,6 +39,45 @@ export default function CatalogPage() {
     };
   }, []);
 
+  const fetchMainMovies = useCallback(async (currentLastDoc: DocumentSnapshot | null, isInitialCall = false) => {
+    if (isFetchingMore && !isInitialCall) return;
+    if (!isInitialCall && !hasMore) return;
+
+    if (isInitialCall) setIsLoading(true);
+    setIsFetchingMore(true);
+
+    try {
+      const { movies: newMovies, lastVisible } = await getMovies(PAGE_SIZE, currentLastDoc);
+      if (isMounted.current) {
+        setMovies(prevMovies => isInitialCall ? newMovies : [...prevMovies, ...newMovies.filter(nm => !prevMovies.find(pm => pm.id === nm.id))]);
+        setLastVisibleDoc(lastVisible);
+        setHasMore(newMovies.length === PAGE_SIZE);
+      }
+    } catch (error) {
+      console.error("Failed to fetch more movies:", error);
+      if (isMounted.current) setHasMore(false);
+    } finally {
+      if (isMounted.current) {
+        setIsFetchingMore(false);
+        if (isInitialCall) setIsLoading(false);
+      }
+    }
+  }, [isFetchingMore, hasMore]);
+
+  const fetchFeaturedMovies = useCallback(async () => {
+    if (!isMounted.current) return;
+    setIsLoadingFeatured(true);
+    try {
+      const { movies: newFeaturedMovies } = await getMovies(FEATURED_MOVIES_COUNT, null);
+      if (isMounted.current) setFeaturedMovies(newFeaturedMovies);
+    } catch (error) {
+      console.error("Failed to fetch featured movies:", error);
+      if (isMounted.current) setFeaturedMovies([]);
+    } finally {
+      if (isMounted.current) setIsLoadingFeatured(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authLoading) {
       if (!user) {
@@ -73,46 +112,6 @@ export default function CatalogPage() {
       }
     }
   }, [user, authLoading, router, toast, signOut, fetchMainMovies, fetchFeaturedMovies, movies.length, hasMore, isFetchingMore]);
-
-
-  const fetchMainMovies = useCallback(async (currentLastDoc: DocumentSnapshot | null, isInitialCall = false) => {
-    if (isFetchingMore && !isInitialCall) return;
-    if (!isInitialCall && !hasMore) return;
-
-    if (isInitialCall) setIsLoading(true);
-    setIsFetchingMore(true);
-
-    try {
-      const { movies: newMovies, lastVisible } = await getMovies(PAGE_SIZE, currentLastDoc);
-      if (isMounted.current) {
-        setMovies(prevMovies => isInitialCall ? newMovies : [...prevMovies, ...newMovies.filter(nm => !prevMovies.find(pm => pm.id === nm.id))]);
-        setLastVisibleDoc(lastVisible);
-        setHasMore(newMovies.length === PAGE_SIZE);
-      }
-    } catch (error) {
-      console.error("Failed to fetch more movies:", error);
-      if (isMounted.current) setHasMore(false);
-    } finally {
-      if (isMounted.current) {
-        setIsFetchingMore(false);
-        if (isInitialCall) setIsLoading(false);
-      }
-    }
-  }, [isFetchingMore, hasMore]); // Removed dependencies that are stable or managed by other effects
-
-  const fetchFeaturedMovies = useCallback(async () => {
-    if (!isMounted.current) return;
-    setIsLoadingFeatured(true);
-    try {
-      const { movies: newFeaturedMovies } = await getMovies(FEATURED_MOVIES_COUNT, null);
-      if (isMounted.current) setFeaturedMovies(newFeaturedMovies);
-    } catch (error) {
-      console.error("Failed to fetch featured movies:", error);
-      if (isMounted.current) setFeaturedMovies([]);
-    } finally {
-      if (isMounted.current) setIsLoadingFeatured(false);
-    }
-  }, []);
 
 
   if (authLoading || (!user && !authLoading) || (user && !user.emailVerified && !authLoading)) { 

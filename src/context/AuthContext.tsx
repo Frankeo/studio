@@ -10,9 +10,9 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut 
 } from 'firebase/auth';
-import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config'; // Added db here
+import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
 import { mockUser, MOCK_USER_CREDENTIALS, mockUserProfileData } from '@/lib/mockData';
-import { fbUpdateUserProfile } from '@/lib/firebase/authService'; 
+import { fbUpdateUserProfile, fbSignUpWithEmailAndPassword } from '@/lib/firebase/authService'; 
 import { getUserProfileFromFirestore } from '@/lib/firebase/firestoreService';
 import GlobalLoader from '@/components/layout/GlobalLoader';
 import type { AuthContextType } from './interfaces';
@@ -25,6 +25,7 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => {},
   signOut: async () => {},
   updateUserProfile: async () => {},
+  signUpWithEmailAndPassword: async () => {},
   userProfileData: null,
   loadingProfile: true,
 });
@@ -46,7 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (uid === mockUser.uid) {
           setUserProfileData(mockUserProfileData);
         } else {
-          setUserProfileData(null);
+           // For new mock users from sign-up, assume they are not admin by default
+          setUserProfileData({ uid, isAdmin: false });
         }
       }
     } catch (error) {
@@ -90,17 +92,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Firebase not configured, use mock authentication
         if (email === MOCK_USER_CREDENTIALS.email && pass === MOCK_USER_CREDENTIALS.password) {
           setUser(mockUser);
-          setUserProfileData(mockUserProfileData);
+          await fetchUserProfile(mockUser.uid); // Fetch mock profile
         } else {
           throw new Error('Invalid mock credentials');
         }
-        setLoadingProfile(false);
+        setLoadingProfile(false); // setLoadingProfile before setLoading
         setLoading(false); 
       }
     } catch (error) {
       setUser(null); 
       setUserProfileData(null);
-      setLoadingProfile(false);
+      setLoadingProfile(false); // setLoadingProfile before setLoading
       setLoading(false);
       throw error; 
     }
@@ -113,15 +115,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isFirebaseConfigured && auth) {
         const provider = new GoogleAuthProvider();
         await firebaseSignInWithPopup(auth, provider);
-        // onAuthStateChanged will update user, fetch profile, and setLoading(false)
+        // onAuthStateChanged will handle the rest
       } else {
-        // Firebase not configured
         setLoadingProfile(false);
         setLoading(false);
         throw new Error('Google Sign-In is not available when Firebase is not configured.');
       }
     } catch (error) {
       setUser(null); 
+      setUserProfileData(null);
+      setLoadingProfile(false);
+      setLoading(false);
+      throw error;
+    }
+  };
+  
+  const localSignUpWithEmailAndPassword = async (email: string, pass: string, displayName?: string, photoURL?: string) => {
+    setLoading(true);
+    setLoadingProfile(true);
+    try {
+      let newUser: User;
+      if (isFirebaseConfigured && auth) {
+        const userCredential = await fbSignUpWithEmailAndPassword(email, pass);
+        newUser = userCredential.user;
+        if (displayName || photoURL) {
+          await fbUpdateUserProfile(newUser, { displayName: displayName || null, photoURL: photoURL || null });
+        }
+        // onAuthStateChanged will set the user and trigger profile fetch
+      } else {
+        // Mock sign-up
+        const userCredential = await fbSignUpWithEmailAndPassword(email, pass); // This will return a mock UserCredential
+        newUser = userCredential.user;
+        if (displayName || photoURL) {
+          await fbUpdateUserProfile(newUser, { displayName: displayName || null, photoURL: photoURL || null });
+          // Manually update newUser object as fbUpdateUserProfile for mock might not reflect if not same ref
+          if (displayName) newUser.displayName = displayName;
+          if (photoURL) newUser.photoURL = photoURL;
+        }
+        setUser(newUser); // Manually set user in mock mode
+        await fetchUserProfile(newUser.uid); // Fetch (mock) profile for the new mock user
+        setLoadingProfile(false);
+        setLoading(false);
+      }
+    } catch (error) {
+      setUser(null);
       setUserProfileData(null);
       setLoadingProfile(false);
       setLoading(false);
@@ -135,9 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (isFirebaseConfigured && auth) {
         await firebaseSignOut(auth);
-        // onAuthStateChanged will set user to null, clear profile, and setLoading(false)
       } else {
-        // Firebase not configured, handle mock sign out
         setUser(null);
         setUserProfileData(null);
         setLoadingProfile(false);
@@ -146,7 +181,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setLoadingProfile(false);
       setLoading(false);
-      // For mock scenario, ensure user is cleared if an unexpected error happened.
       if (!isFirebaseConfigured) { 
           setUser(null);
           setUserProfileData(null);
@@ -160,26 +194,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("No user is signed in to update.");
     }
     // setLoading(true); // Potentially set loading for the auth user object
+    setLoadingProfile(true); // Indicate profile data might change
     try {
       if (isFirebaseConfigured && auth && auth.currentUser) {
         await fbUpdateUserProfile(auth.currentUser, updates);
-        // onAuthStateChanged should update the auth user state automatically.
-        // The user object in context will reflect changes like displayName and photoURL.
+        // onAuthStateChanged should update the auth user state.
+        // We may need to re-fetch profile data if it's also stored/derived in Firestore.
+        // For now, assuming onAuthStateChanged handles the Firebase Auth user object updates.
+        // If display name/photoURL from Firebase Auth is the sole source, this is fine.
+        // If these are also in Firestore `users` collection, that would need separate update logic not part of this function.
+        
+        // Manually update user state for immediate reflection if needed, though onAuthStateChanged should handle it.
+         setUser(prevUser => prevUser ? { ...prevUser, ...updates } : null);
+
       } else if (!isFirebaseConfigured && user.uid === mockUser.uid) {
-        // Handle mock user update
-        const updatedMockUser = { ...mockUser };
-        if (updates.displayName !== undefined) {
-          updatedMockUser.displayName = updates.displayName;
-        }
-        if (updates.photoURL !== undefined) {
-          updatedMockUser.photoURL = updates.photoURL;
-        }
-        Object.assign(mockUser, updatedMockUser); 
-        setUser(updatedMockUser); 
-      } else {
+        await fbUpdateUserProfile(mockUser, updates); // This updates the global mockUser
+        setUser({ ...mockUser }); // Update context user state from the updated global mockUser
+      } else if (!isFirebaseConfigured && user) {
+        // For other mock users (e.g. from mock sign up)
+        const updatedUser = {...user};
+        if(updates.displayName !== undefined) updatedUser.displayName = updates.displayName;
+        if(updates.photoURL !== undefined) updatedUser.photoURL = updates.photoURL;
+        setUser(updatedUser);
+      }
+       else {
         throw new Error("Profile update is not available.");
       }
     } finally {
+      setLoadingProfile(false);
       // setLoading(false);
     }
   };
@@ -196,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle: localSignInWithGoogle, 
       signOut: localSignOut,
       updateUserProfile: localUpdateUserProfile,
+      signUpWithEmailAndPassword: localSignUpWithEmailAndPassword,
       userProfileData,
       loadingProfile,
     }}>

@@ -5,9 +5,9 @@ import {
   createUserWithEmailAndPassword, 
   GoogleAuthProvider, 
   signInWithPopup,
-  updateProfile, // Import updateProfile
+  updateProfile, 
   type UserCredential,
-  type User // Import User type
+  type User 
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from './config';
 import { MOCK_USER_CREDENTIALS, mockUser } from '../mockData';
@@ -29,9 +29,33 @@ export const fbSignInWithEmail = async (email: string, password: string): Promis
 };
 
 // Sign up with email and password
-export const fbSignUpWithEmail = async (email: string, password: string): Promise<UserCredential> => {
+export const fbSignUpWithEmailAndPassword = async (email: string, password: string): Promise<UserCredential> => {
    if (!isFirebaseConfigured || !auth) {
-    return Promise.reject(new Error('Sign up is not available in mock mode.'));
+    // For mock mode, we can simulate a user creation.
+    // This won't actually create a persistent user but allows the flow to proceed.
+    // For a more robust mock, you might want to add this "new user" to an in-memory list.
+    console.warn("Firebase not configured. Simulating user sign-up.");
+    const newMockUser: User = {
+      ...mockUser, // Base it on the existing mock structure
+      uid: `mock-user-${Date.now()}`,
+      email: email,
+      displayName: null, // Will be set by updateUserProfile if provided
+      photoURL: null, // Will be set by updateUserProfile if provided
+      emailVerified: false, // New users typically aren't verified immediately
+      providerData: [{
+        providerId: 'password',
+        uid: `mock-user-${Date.now()}`,
+        displayName: null,
+        email: email,
+        phoneNumber: null,
+        photoURL: null,
+      }],
+    };
+    return Promise.resolve({
+      user: newMockUser,
+      providerId: 'password',
+      operationType: 'signIn', // createUserWithEmailAndPassword also signs the user in
+    } as UserCredential);
   }
   return createUserWithEmailAndPassword(auth, email, password);
 };
@@ -60,16 +84,31 @@ export const fbUpdateUserProfile = async (
   updates: { displayName?: string | null; photoURL?: string | null }
 ): Promise<void> => {
   if (!isFirebaseConfigured || !auth) {
-      // Handle mock user update
-      const updatedMockUser = { ...mockUser };
-      if (updates.displayName !== undefined) {
-        updatedMockUser.displayName = updates.displayName;
+      // Handle mock user update. We need to be careful if currentUser is the shared mockUser.
+      // If it's a new "mock" user from sign-up, we update its properties.
+      if (currentUser && typeof currentUser.uid === 'string') { // Check if currentUser is a valid-like object
+        const userToUpdate = currentUser === mockUser ? { ...mockUser } : { ...currentUser };
+
+        if (updates.displayName !== undefined) {
+          userToUpdate.displayName = updates.displayName;
+        }
+        if (updates.photoURL !== undefined) {
+          userToUpdate.photoURL = updates.photoURL;
+        }
+        
+        // If it was the main mockUser, update the global mockUser object
+        if (currentUser.uid === mockUser.uid) {
+            Object.assign(mockUser, userToUpdate);
+        } else {
+            // If it was a new mock user (e.g. from mock sign up), this update is more "in-memory" for that instance
+            // The AuthContext would need to get this specific instance to reflect the change.
+            // For simplicity, our mock sign up provides a User object that AuthContext then uses.
+            // Direct updates to 'currentUser' param might not reflect in AuthContext unless it's the exact same object reference.
+            // This is a limitation of deep mocking complex state updates.
+            // The onAuthStateChanged mechanism in real Firebase handles this seamlessly.
+            // For the provided sign-up flow, the new user from `fbSignUpWithEmailAndPassword` will be the one whose profile is updated.
+        }
       }
-      if (updates.photoURL !== undefined) {
-        updatedMockUser.photoURL = updates.photoURL;
-      }
-      // Update the global mockUser object if necessary, or just the local state
-      Object.assign(mockUser, updatedMockUser); // Update the shared mockUser
     return Promise.resolve();
   }
   if (!currentUser) {

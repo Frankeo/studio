@@ -129,8 +129,7 @@ export default function LoginForm() {
           </Button>
         </CardContent>
         <CardFooter className="text-center text-sm">
-          Don&apos;t have an account? <Link href="#" className="ml-1 underline text-primary hover:text-primary/80">Sign up</Link>
-           {/* For now, sign up can redirect to login or be a separate page. This is a placeholder. */}
+          Don&apos;t have an account? <Link href="/signup" className="ml-1 underline text-primary hover:text-primary/80">Sign up</Link>
         </CardFooter>
       </Card>
     </div>

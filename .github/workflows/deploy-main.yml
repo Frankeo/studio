@@ -44,3 +44,5 @@ jobs:
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           projectId: '${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}' # Requires NEXT_PUBLIC_FIREBASE_PROJECT_ID repository variable
           channelId: live # Deploy to the live channel
+        env:
+          FIREBASE_CLI_EXPERIMENTS: webframeworks

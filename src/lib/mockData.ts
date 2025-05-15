@@ -1,7 +1,7 @@
 
-import { type User } from 'firebase/auth';
+import { UserProfile, type User } from 'firebase/auth';
 import type { Movie } from '@/types/movie';
-import type { UserProfile } from '@/types/userProfile';
+
 
 export const MOCK_VIDEO_URL = "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4";
 

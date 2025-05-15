@@ -1,9 +1,10 @@
 
 import { db, isFirebaseConfigured } from './config';
 import type { Movie } from '@/types/movie';
-import type { UserProfile } from '@/types/userProfile';
+
 import { mockMovies, MOCK_VIDEO_URL, mockUserProfileData } from '../mockData';
 import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, type FieldPath, addDoc } from 'firebase/firestore';
+import { UserProfile } from 'firebase/auth';
 
 const MOVIES_COLLECTION = 'movies';
 const USERS_COLLECTION = 'users';

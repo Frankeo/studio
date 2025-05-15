@@ -1,6 +1,6 @@
 
-import type { User } from "firebase/auth";
-import type { UserProfile } from "@/types/userProfile";
+import type { User, UserProfile } from "firebase/auth";
+
 
 export interface AuthContextType {
     user: User | null;

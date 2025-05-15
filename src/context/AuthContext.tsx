@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { User } from 'firebase/auth';
+import type { User, UserProfile } from 'firebase/auth';
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { 
   onAuthStateChanged, 
@@ -16,7 +16,7 @@ import { fbUpdateUserProfile, fbSignUpWithEmailAndPassword } from '@/lib/firebas
 import { getUserProfileFromFirestore } from '@/lib/firebase/firestoreService';
 import GlobalLoader from '@/components/layout/GlobalLoader';
 import type { AuthContextType } from './interfaces';
-import type { UserProfile } from '@/types/userProfile';
+
 
 const AuthContext = createContext<AuthContextType>({ 
   user: null, 
@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setLoadingProfile(true);
     try {
-      let newUser: User;
+      let newUser;
       if (isFirebaseConfigured && auth) {
         const userCredential = await fbSignUpWithEmailAndPassword(email, pass); 
         newUser = userCredential.user;
@@ -157,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         // Mock sign-up
         const userCredential = await fbSignUpWithEmailAndPassword(email, pass); 
-        newUser = userCredential.user;
+        newUser = {...userCredential.user};
         if (displayName || photoURL) {
           await fbUpdateUserProfile(newUser, { displayName: displayName || null, photoURL: photoURL || null });
           if (displayName) newUser.displayName = displayName;

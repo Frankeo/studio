@@ -71,7 +71,7 @@ export default function Header() {
                     <span>Profile</span>
                   </Link>
                 </DropdownMenuItem>
-                {userProfileData?.isAdmin && (
+                {userProfileData?.isAdmin === true && (
                   <DropdownMenuItem asChild className="cursor-pointer">
                     <Link href="/add-movie">
                       <Film className="mr-2 h-4 w-4" />

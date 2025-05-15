@@ -50,9 +50,9 @@ export default function SignUpPage() {
       await signUpWithEmailAndPassword(data.email, data.password, data.displayName || undefined, data.photoURL || undefined);
       toast({ 
         title: 'Sign Up Successful', 
-        description: 'Welcome! A verification email has been sent to your address. Please check your inbox.' 
+        description: 'A verification email has been sent. Please verify your email and then log in.' 
       });
-      router.push('/catalog');
+      router.push('/login'); // Redirect to login page after sign up
     } catch (error) {
       toast({
         title: 'Sign Up Failed',

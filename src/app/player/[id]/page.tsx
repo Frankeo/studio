@@ -8,51 +8,60 @@ import { getMovieById } from '@/lib/firebase/firestoreService';
 import type { Movie } from '@/types/movie';
 import Header from '@/components/layout/Header';
 import VideoPlayerComponent from '@/components/player/VideoPlayerComponent';
-import { Clapperboard, ArrowLeft } from 'lucide-react'; // Changed from Loader2
+import { Clapperboard, ArrowLeft } from 'lucide-react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast'; // Corrected import path
+import { useToast } from '@/hooks/use-toast'; 
 
 export default function PlayerPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const params = useParams();
   const movieId = params.id as string;
-  const { toast } = useToast(); // useToast hook
+  const { toast } = useToast(); 
 
   const [movie, setMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/login');
+    if (!authLoading) {
+      if (!user) {
+        router.replace('/login');
+        return;
+      }
+      if (user && !user.emailVerified) {
+        toast({
+          title: "Email Verification Required",
+          description: "Please verify your email to access this page. Check your inbox.",
+          variant: "destructive",
+        });
+        signOut();
+        router.replace('/login');
+        return;
+      }
+      // User is authenticated and verified
+      if (movieId) {
+        setIsLoading(true);
+        getMovieById(movieId)
+          .then((data) => {
+            if (data) {
+              setMovie(data);
+            } else {
+              toast({ title: "Error", description: "Movie not found.", variant: "destructive" });
+              router.replace('/catalog');
+            }
+          })
+          .catch(error => {
+            console.error("Failed to fetch movie:", error);
+            toast({ title: "Error", description: "Failed to load movie details.", variant: "destructive" });
+          })
+          .finally(() => setIsLoading(false));
+      }
     }
-  }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (user && movieId) {
-      setIsLoading(true);
-      getMovieById(movieId)
-        .then((data) => {
-          if (data) {
-            setMovie(data);
-          } else {
-            toast({ title: "Error", description: "Movie not found.", variant: "destructive" });
-            router.replace('/catalog');
-          }
-        })
-        .catch(error => {
-          console.error("Failed to fetch movie:", error);
-          toast({ title: "Error", description: "Failed to load movie details.", variant: "destructive" });
-        })
-        .finally(() => setIsLoading(false));
-    } else if (!authLoading && !user) {
-      router.replace('/login');
-    }
-  }, [user, movieId, router, authLoading, toast]);
+  }, [user, authLoading, movieId, router, toast, signOut]);
 
 
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading || (!user && !authLoading) || (user && !user.emailVerified && !authLoading)) {
     return (
       <>
         <Header />
@@ -66,21 +75,7 @@ export default function PlayerPage() {
     );
   }
 
-  if (!user) {
-     return (
-       <>
-        <Header />
-        <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-          <p>Redirecting to login...</p>
-        </div>
-         <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border">
-          © {new Date().getFullYear()} StreamVerse. All rights reserved.
-        </footer>
-      </>
-    );
-  }
-
-  if (!movie) {
+  if (!movie) { // This will be hit if movie fetch failed or movie is null after loading
     return (
       <>
         <Header />

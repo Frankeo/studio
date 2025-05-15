@@ -27,7 +27,7 @@ const profileSchema = z.object({
 type ProfileFormInputs = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
-  const { user, loading: authLoading, updateUserProfile, userProfileData, loadingProfile } = useAuth();
+  const { user, loading: authLoading, updateUserProfile, userProfileData, loadingProfile, signOut } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -48,16 +48,31 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/login');
+    if (!authLoading) {
+      if (!user) {
+        router.replace('/login');
+        return;
+      }
+      if (user && !user.emailVerified) {
+        toast({
+          title: "Email Verification Required",
+          description: "Please verify your email to access this page. Check your inbox.",
+          variant: "destructive",
+        });
+        signOut();
+        router.replace('/login');
+        return;
+      }
+      // User is authenticated and verified
+      if (user) {
+        reset({
+          displayName: user.displayName || '',
+          photoURL: user.photoURL || '',
+        });
+      }
     }
-    if (user) {
-      reset({
-        displayName: user.displayName || '',
-        photoURL: user.photoURL || '',
-      });
-    }
-  }, [user, authLoading, router, reset]);
+  }, [user, authLoading, router, reset, toast, signOut]);
+
 
   const onSubmit: SubmitHandler<ProfileFormInputs> = async (data) => {
     if (!user) return;
@@ -92,7 +107,7 @@ export default function ProfilePage() {
 
   const currentPhotoURL = watch('photoURL');
 
-  if (authLoading || (!user && !authLoading) || (user && loadingProfile && !userProfileData) ) {
+  if (authLoading || (!user && !authLoading) || (user && !user.emailVerified && !authLoading) || (user && loadingProfile && !userProfileData) ) {
     return (
       <>
         <Header />
@@ -106,12 +121,12 @@ export default function ProfilePage() {
     );
   }
   
-  if (!user) {
+  if (!user) { // Fallback if effect hasn't redirected yet
      return (
        <>
         <Header />
         <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-          <p>Redirecting to login...</p>
+          <p>Redirecting...</p>
         </div>
          <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border">
           © {new Date().getFullYear()} StreamVerse. All rights reserved.

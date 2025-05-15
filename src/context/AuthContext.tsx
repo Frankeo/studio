@@ -64,6 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
         setUser(currentUser);
         if (currentUser) {
+          // Email verification is not strictly checked here for setting the user object,
+          // but rather on page access or during specific login flows.
           await fetchUserProfile(currentUser.uid);
         } else {
           setUserProfileData(null);
@@ -86,23 +88,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoadingProfile(true);
     try {
       if (isFirebaseConfigured && auth) {
-        await firebaseSignInWithEmailAndPassword(auth, email, pass);
-        // onAuthStateChanged will update user, fetch profile, and setLoading(false)
+        const userCredential = await firebaseSignInWithEmailAndPassword(auth, email, pass);
+        if (userCredential.user && !userCredential.user.emailVerified) {
+          await firebaseSignOut(auth); // Sign out the unverified user from Firebase
+          throw new Error('Email not verified. Please check your email inbox for the verification link.');
+        }
+        // onAuthStateChanged will update user, fetch profile, and setLoading(false) for verified users
       } else {
-        // Firebase not configured, use mock authentication
+        // Mock authentication
         if (email === MOCK_USER_CREDENTIALS.email && pass === MOCK_USER_CREDENTIALS.password) {
+          // In mock mode, assume email is always verified for the mock admin
           setUser(mockUser);
-          await fetchUserProfile(mockUser.uid); // Fetch mock profile
+          await fetchUserProfile(mockUser.uid); 
         } else {
           throw new Error('Invalid mock credentials');
         }
-        setLoadingProfile(false); // setLoadingProfile before setLoading
+        setLoadingProfile(false); 
         setLoading(false); 
       }
     } catch (error) {
       setUser(null); 
       setUserProfileData(null);
-      setLoadingProfile(false); // setLoadingProfile before setLoading
+      setLoadingProfile(false);
       setLoading(false);
       throw error; 
     }
@@ -114,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (isFirebaseConfigured && auth) {
         const provider = new GoogleAuthProvider();
+        // Google sign-in usually implies email verification is handled by Google
         await firebaseSignInWithPopup(auth, provider);
         // onAuthStateChanged will handle the rest
       } else {
@@ -136,24 +144,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       let newUser: User;
       if (isFirebaseConfigured && auth) {
-        const userCredential = await fbSignUpWithEmailAndPassword(email, pass); // This now handles sending verification email
+        const userCredential = await fbSignUpWithEmailAndPassword(email, pass); 
         newUser = userCredential.user;
         if (displayName || photoURL) {
           await fbUpdateUserProfile(newUser, { displayName: displayName || null, photoURL: photoURL || null });
         }
-        // onAuthStateChanged will set the user and trigger profile fetch
+        // User will be set by onAuthStateChanged, but they will be unverified initially.
+        // The sign-up page will redirect to login with appropriate message.
+        // No need to manually set user here; let onAuthStateChanged handle it.
+        setLoading(false); // setLoading false once operation done.
+        setLoadingProfile(false); // Profile won't be fetched until verified login
       } else {
         // Mock sign-up
-        const userCredential = await fbSignUpWithEmailAndPassword(email, pass); // This will return a mock UserCredential
+        const userCredential = await fbSignUpWithEmailAndPassword(email, pass); 
         newUser = userCredential.user;
         if (displayName || photoURL) {
           await fbUpdateUserProfile(newUser, { displayName: displayName || null, photoURL: photoURL || null });
-          // Manually update newUser object as fbUpdateUserProfile for mock might not reflect if not same ref
           if (displayName) newUser.displayName = displayName;
           if (photoURL) newUser.photoURL = photoURL;
         }
-        setUser(newUser); // Manually set user in mock mode
-        await fetchUserProfile(newUser.uid); // Fetch (mock) profile for the new mock user
+        // For mock, we can set user directly and assume verified for simplicity of testing other flows
+        // or set emailVerified to false if we want to test the verification flow in mock
+        // For now, let's keep it simple: mock sign-up leads to a usable "verified" mock user
+        // But for the requested feature, new mock users should be unverified.
+        newUser.emailVerified = false; // Explicitly set to false for mock sign-up
+        setUser(newUser); 
+        await fetchUserProfile(newUser.uid); 
         setLoadingProfile(false);
         setLoading(false);
       }
@@ -172,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (isFirebaseConfigured && auth) {
         await firebaseSignOut(auth);
+        // onAuthStateChanged will set user to null
       } else {
         setUser(null);
         setUserProfileData(null);
@@ -193,25 +210,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) {
       throw new Error("No user is signed in to update.");
     }
-    // setLoading(true); // Potentially set loading for the auth user object
-    setLoadingProfile(true); // Indicate profile data might change
+    setLoadingProfile(true); 
     try {
       if (isFirebaseConfigured && auth && auth.currentUser) {
         await fbUpdateUserProfile(auth.currentUser, updates);
-        // onAuthStateChanged should update the auth user state.
-        // We may need to re-fetch profile data if it's also stored/derived in Firestore.
-        // For now, assuming onAuthStateChanged handles the Firebase Auth user object updates.
-        // If display name/photoURL from Firebase Auth is the sole source, this is fine.
-        // If these are also in Firestore `users` collection, that would need separate update logic not part of this function.
-        
-        // Manually update user state for immediate reflection if needed, though onAuthStateChanged should handle it.
          setUser(prevUser => prevUser ? { ...prevUser, ...updates } : null);
 
       } else if (!isFirebaseConfigured && user.uid === mockUser.uid) {
-        await fbUpdateUserProfile(mockUser, updates); // This updates the global mockUser
-        setUser({ ...mockUser }); // Update context user state from the updated global mockUser
+        await fbUpdateUserProfile(mockUser, updates); 
+        setUser({ ...mockUser }); 
       } else if (!isFirebaseConfigured && user) {
-        // For other mock users (e.g. from mock sign up)
         const updatedUser = {...user};
         if(updates.displayName !== undefined) updatedUser.displayName = updates.displayName;
         if(updates.photoURL !== undefined) updatedUser.photoURL = updates.photoURL;
@@ -222,13 +230,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } finally {
       setLoadingProfile(false);
-      // setLoading(false);
     }
   };
 
-  if (loading && !user) { 
+  if (loading && !user && isFirebaseConfigured) { // Only show global loader if Firebase is configured and initial check is pending
     return <GlobalLoader />;
   }
+
 
   return (
     <AuthContext.Provider value={{ 

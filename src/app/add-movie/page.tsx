@@ -34,7 +34,7 @@ const movieSchema = z.object({
 type MovieFormInputs = z.infer<typeof movieSchema>;
 
 export default function AddMoviePage() {
-  const { user, loading: authLoading, userProfileData, loadingProfile } = useAuth();
+  const { user, loading: authLoading, userProfileData, loadingProfile, signOut } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,7 +46,7 @@ export default function AddMoviePage() {
     formState: { errors },
   } = useForm<MovieFormInputs>({
     resolver: zodResolver(movieSchema),
-    defaultValues: { // Initialize with default values to prevent uncontrolled components
+    defaultValues: { 
         title: '',
         description: '',
         posterUrl: '',
@@ -62,23 +62,35 @@ export default function AddMoviePage() {
     if (!authLoading && !loadingProfile) {
       if (!user) {
         router.replace('/login');
-      } else if (!userProfileData?.isAdmin) {
+        return;
+      }
+      if (user && !user.emailVerified) {
+        toast({
+          title: "Email Verification Required",
+          description: "Please verify your email to access this page.",
+          variant: "destructive",
+        });
+        signOut();
+        router.replace('/login');
+        return;
+      }
+      if (!userProfileData?.isAdmin) {
         toast({ title: "Access Denied", description: "You do not have permission to access this page.", variant: "destructive" });
         router.replace('/catalog');
       }
     }
-  }, [user, authLoading, userProfileData, loadingProfile, router, toast]);
+  }, [user, authLoading, userProfileData, loadingProfile, router, toast, signOut]);
 
   const onSubmit: SubmitHandler<MovieFormInputs> = async (data) => {
     setIsSubmitting(true);
     try {
       const movieData: Omit<Movie, 'id'> = {
         ...data,
-        posterUrl: data.posterUrl || `https://placehold.co/300x450.png`, // Default placeholder
+        posterUrl: data.posterUrl || `https://placehold.co/300x450.png`, 
       };
       const newMovieId = await addMovieToFirestore(movieData);
       toast({ title: 'Movie Added', description: `"${data.title}" has been successfully added with ID: ${newMovieId}.` });
-      reset(); // Reset form fields
+      reset(); 
     } catch (error) {
       console.error("Error adding movie:", error);
       toast({
@@ -91,13 +103,12 @@ export default function AddMoviePage() {
     }
   };
 
-  if (authLoading || loadingProfile) {
+  if (authLoading || loadingProfile || (!user && !authLoading) || (user && !user.emailVerified && !authLoading) || (user && user.emailVerified && !userProfileData && !loadingProfile) ) {
     return <GlobalLoader />;
   }
 
-  if (!user || !userProfileData?.isAdmin) {
-    // This case should ideally be handled by the useEffect redirect,
-    // but it's good practice to have a fallback.
+  // Fallback if effects haven't caught redirection yet or if admin check fails after loading
+  if (!user || !user.emailVerified || !userProfileData?.isAdmin) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />

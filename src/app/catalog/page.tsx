@@ -9,23 +9,25 @@ import type { Movie } from '@/types/movie';
 import MovieGrid from '@/components/catalog/MovieGrid';
 import Header from '@/components/layout/Header';
 import FeaturedMoviesSection from '@/components/catalog/FeaturedMoviesSection';
-import { Clapperboard } from 'lucide-react'; // Changed from Loader2
+import { Clapperboard } from 'lucide-react'; 
 import type { DocumentSnapshot } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 const PAGE_SIZE = 12;
 const FEATURED_MOVIES_COUNT = 5;
 
 export default function CatalogPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [featuredMovies, setFeaturedMovies] = useState<Movie[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // For initial page load (main grid)
+  const [isLoading, setIsLoading] = useState(true); 
   const [isLoadingFeatured, setIsLoadingFeatured] = useState(true);
   const [lastVisibleDoc, setLastVisibleDoc] = useState<DocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [isFetchingMore, setIsFetchingMore] = useState(false); // For "Load More" button activity
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
 
   const initialLoadDone = useRef(false);
   const isMounted = useRef(false);
@@ -37,102 +39,83 @@ export default function CatalogPage() {
     };
   }, []);
 
-  const fetchMainMovies = useCallback(async (currentLastDoc: DocumentSnapshot | null, isInitialCall = false) => {
-    if (isFetchingMore && !isInitialCall) { 
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.replace('/login');
         return;
-    }
-    if (!isInitialCall && !hasMore) { 
+      }
+      if (user && !user.emailVerified) {
+        toast({
+          title: "Email Verification Required",
+          description: "Please verify your email address to access the platform. Check your inbox.",
+          variant: "destructive",
+        });
+        signOut(); // Sign out from context and firebase
+        router.replace('/login');
         return;
+      }
+      // User is authenticated and verified
+      if (!initialLoadDone.current) {
+        initialLoadDone.current = true;
+        if (isMounted.current) {
+          setMovies([]);
+          setFeaturedMovies([]);
+          setLastVisibleDoc(null);
+          setHasMore(true);
+        }
+        fetchFeaturedMovies();
+        fetchMainMovies(null, true);
+      } else {
+         if (isMounted.current && !isFetchingMore && (movies.length > 0 || !hasMore)) {
+          setIsLoading(false);
+        }
+      }
     }
+  }, [user, authLoading, router, toast, signOut, fetchMainMovies, fetchFeaturedMovies, movies.length, hasMore, isFetchingMore]);
 
-    if (isInitialCall) {
-      setIsLoading(true); 
-    }
-    setIsFetchingMore(true); 
+
+  const fetchMainMovies = useCallback(async (currentLastDoc: DocumentSnapshot | null, isInitialCall = false) => {
+    if (isFetchingMore && !isInitialCall) return;
+    if (!isInitialCall && !hasMore) return;
+
+    if (isInitialCall) setIsLoading(true);
+    setIsFetchingMore(true);
 
     try {
       const { movies: newMovies, lastVisible } = await getMovies(PAGE_SIZE, currentLastDoc);
       if (isMounted.current) {
-        setMovies(prevMovies => {
-          if (isInitialCall) return newMovies; 
-          const existingMovieIds = new Set(prevMovies.map(m => m.id));
-          const uniqueNewMovies = newMovies.filter(nm => !existingMovieIds.has(nm.id));
-          return [...prevMovies, ...uniqueNewMovies];
-        });
+        setMovies(prevMovies => isInitialCall ? newMovies : [...prevMovies, ...newMovies.filter(nm => !prevMovies.find(pm => pm.id === nm.id))]);
         setLastVisibleDoc(lastVisible);
         setHasMore(newMovies.length === PAGE_SIZE);
       }
     } catch (error) {
       console.error("Failed to fetch more movies:", error);
-      if (isMounted.current) setHasMore(false); 
+      if (isMounted.current) setHasMore(false);
     } finally {
       if (isMounted.current) {
         setIsFetchingMore(false);
-        if (isInitialCall) {
-          setIsLoading(false); 
-        }
+        if (isInitialCall) setIsLoading(false);
       }
     }
-  }, [isFetchingMore, hasMore, setIsLoading, setIsFetchingMore, setMovies, setLastVisibleDoc, setHasMore]);
+  }, [isFetchingMore, hasMore]); // Removed dependencies that are stable or managed by other effects
 
   const fetchFeaturedMovies = useCallback(async () => {
     if (!isMounted.current) return;
     setIsLoadingFeatured(true);
     try {
       const { movies: newFeaturedMovies } = await getMovies(FEATURED_MOVIES_COUNT, null);
-      if (isMounted.current) {
-        setFeaturedMovies(newFeaturedMovies);
-      }
+      if (isMounted.current) setFeaturedMovies(newFeaturedMovies);
     } catch (error) {
       console.error("Failed to fetch featured movies:", error);
-      if (isMounted.current) setFeaturedMovies([]); // Set to empty on error
+      if (isMounted.current) setFeaturedMovies([]);
     } finally {
-      if (isMounted.current) {
-        setIsLoadingFeatured(false);
-      }
+      if (isMounted.current) setIsLoadingFeatured(false);
     }
   }, []);
 
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/login');
-      initialLoadDone.current = false; 
-      if (isMounted.current) {
-        setMovies([]);
-        setFeaturedMovies([]);
-        setLastVisibleDoc(null);
-        setHasMore(true);
-        setIsLoading(true); 
-        setIsLoadingFeatured(true);
-      }
-      return;
-    }
-
-    if (user && !authLoading) {
-      if (!initialLoadDone.current) {
-        initialLoadDone.current = true;
-        if (isMounted.current) {
-          setMovies([]); 
-          setFeaturedMovies([]);
-          setLastVisibleDoc(null);
-          setHasMore(true); 
-        }
-        fetchFeaturedMovies();
-        fetchMainMovies(null, true); 
-      } else {
-        if (isMounted.current && !isFetchingMore && (movies.length > 0 || !hasMore)) {
-          setIsLoading(false);
-        }
-         if (isMounted.current && !isLoadingFeatured && (featuredMovies.length > 0 || featuredMovies.length === 0)) {
-           // If featured movies load attempt is done, ensure its loading state is false
-         }
-      }
-    } // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, router, fetchMainMovies, fetchFeaturedMovies, featuredMovies.length, hasMore, isFetchingMore, isLoadingFeatured, movies.length]);
-
-
-  if (authLoading || (isLoading && movies.length === 0 && hasMore && isLoadingFeatured && featuredMovies.length === 0)) { 
+  if (authLoading || (!user && !authLoading) || (user && !user.emailVerified && !authLoading)) { 
     return (
       <>
         <Header />
@@ -145,20 +128,6 @@ export default function CatalogPage() {
       </>
     );
   }
-
-  if (!user) {
-    return (
-       <>
-        <Header />
-        <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-          <p>Redirecting to login...</p>
-        </div>
-         <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border">
-          © {new Date().getFullYear()} StreamVerse. All rights reserved.
-        </footer>
-      </>
-    );
-  }
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -167,7 +136,7 @@ export default function CatalogPage() {
         <FeaturedMoviesSection movies={featuredMovies} isLoading={isLoadingFeatured} />
         
         <h1 className="text-3xl font-bold mb-8 text-foreground">Movie Catalog</h1>
-        {isLoading && movies.length === 0 && ( // Show grid loading only if it's the initial load for the grid
+        {isLoading && movies.length === 0 && ( 
            <div className="flex justify-center py-10">
             <Clapperboard className="h-12 w-12 text-primary animate-pulse" />
           </div>

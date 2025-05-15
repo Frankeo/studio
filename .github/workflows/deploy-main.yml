@@ -47,6 +47,7 @@ jobs:
         run: firebase deploy --only hosting --project ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
         env:
           # Use a service account for authentication
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           GOOGLE_APPLICATION_CREDENTIALS: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           # If you have a specific target for App Hosting, add it here
           # For example: FIREBASE_APP_HOSTING_TARGET: your-app-hosting-target-name

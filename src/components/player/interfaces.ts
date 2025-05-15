@@ -21,7 +21,3 @@ export interface ScreenMobile {
   unlock?: () => void;
   type?: OrientationType; // Added type property
 }
-
-export interface MockVideoElement{
-  _playsInline?: boolean
-}

@@ -1,0 +1,58 @@
+#!/bin/sh
+[ -n "$HUSKY_DEBUG" ] && echo "husky:debug Sourcing husky.sh" >&2
+. "$(dirname -- "$0")/_/husky.sh"
+[ -n "$HUSKY_DEBUG" ] && echo "husky:debug husky.sh sourced" >&2
+
+# The remote ref for the dev branch
+TARGET_BRANCH_REF="refs/heads/dev"
+PROCEED_WITH_PUSH=0 # 0 for proceed, 1 for block
+
+echo "Husky pre-push hook running..."
+
+# Read the refs being pushed from stdin
+# Format: <local_ref> <local_sha1> <remote_ref> <remote_sha1>
+found_dev_branch=false
+while read local_ref local_sha remote_ref remote_sha
+do
+  # For debugging, you can uncomment the next line
+  # echo "Checking push: Local Ref: $local_ref, Remote Ref: $remote_ref"
+  if [ "$remote_ref" = "$TARGET_BRANCH_REF" ]; then
+    found_dev_branch=true
+    echo "Attempting to push to the 'dev' branch. Running checks..."
+    break
+  fi
+done
+
+if [ "$found_dev_branch" = true ]; then
+  echo "Running linter..."
+  npm run lint
+  if [ $? -ne 0 ]; then
+    echo "Linting failed. Push aborted."
+    exit 1
+  fi
+  echo "Linting passed."
+
+  echo "Running type checks..."
+  npm run typecheck
+  if [ $? -ne 0 ]; then
+    echo "Type checking failed. Push aborted."
+    exit 1
+  fi
+  echo "Type checks passed."
+
+  echo "Running tests..."
+  npm run test # This uses "vitest run --passWithNoTests" from package.json
+  if [ $? -ne 0 ]; then
+    echo "Tests failed. Push aborted."
+    exit 1
+  fi
+  echo "Tests passed."
+  
+  echo "All checks passed for 'dev' branch. Proceeding with push."
+  PROCEED_WITH_PUSH=0
+else
+  echo "Not pushing to 'dev' branch or no refs targeting 'dev'. Skipping pre-push checks for other branches/refs."
+  PROCEED_WITH_PUSH=0 # Allow push for other branches without these specific checks
+fi
+
+exit $PROCEED_WITH_PUSH

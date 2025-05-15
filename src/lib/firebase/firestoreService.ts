@@ -1,8 +1,9 @@
 
 import { db } from './config';
 import type { Movie } from '@/types/movie';
-import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, type FieldPath, addDoc, setDoc } from 'firebase/firestore'; // Added setDoc
+import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, addDoc, setDoc } from 'firebase/firestore'; // Added setDoc
 import type { UserProfile } from 'firebase/auth'; // Changed from 'firebase/auth' to actual UserProfile path if different
+import type { PaginatedMoviesResult } from './interfaces';
 
 const MOVIES_COLLECTION = 'movies';
 const USERS_COLLECTION = 'users';
@@ -22,11 +23,6 @@ const mapDocToMovie = (docSnap: QueryDocumentSnapshot | DocumentSnapshot): Movie
     year: data?.year || 0,
   } as Movie;
 };
-
-interface PaginatedMoviesResult {
-  movies: Movie[];
-  lastVisible: DocumentSnapshot | null;
-}
 
 export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot | null = null): Promise<PaginatedMoviesResult> => {
   if (!db) {
@@ -111,7 +107,6 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
   }
 };
 
-// Add a new movie to Firestore
 export const addMovieToFirestore = async (movieData: Omit<Movie, 'id'>): Promise<string> => {
   if (!db) {
     throw new Error("Firestore (db) is not initialized. Cannot add movie.");

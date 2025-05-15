@@ -13,9 +13,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Define known placeholder values for the API key
-const PLACEHOLDER_API_KEYS = ["YOUR_API_KEY", "YOUR_FIREBASE_API_KEY", ""];
-
 // Validate environment variables
 const requiredConfigKeys: (keyof typeof firebaseConfig)[] = [
   'apiKey',
@@ -33,14 +30,10 @@ let storage: FirebaseStorage | null = null;
 export let isFirebaseConfigured: boolean;
 
 const missingKeys = requiredConfigKeys.filter(key => !firebaseConfig[key]);
-const apiKeyIsInvalid = firebaseConfig.apiKey && (PLACEHOLDER_API_KEYS.includes(firebaseConfig.apiKey) || firebaseConfig.apiKey.trim() === "" || firebaseConfig.apiKey === "null" || firebaseConfig.apiKey === "undefined");
 
-
-if (missingKeys.length > 0 || apiKeyIsInvalid) {
+if (missingKeys.length > 0) {
   isFirebaseConfigured = false;
-  const reason = missingKeys.length > 0
-    ? `Firebase configuration is missing or empty for the following keys: ${missingKeys.join(', ')}.`
-    : `Firebase API key (NEXT_PUBLIC_FIREBASE_API_KEY) is set to a placeholder or invalid value ("${firebaseConfig.apiKey}").`;
+  const reason = `Firebase configuration is missing or empty for the following keys: ${missingKeys.join(', ')}.`
   
   console.warn(
     `${reason} 
@@ -55,7 +48,7 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="YOUR_MESSAGING_SENDER_ID"
 NEXT_PUBLIC_FIREBASE_APP_ID="YOUR_APP_ID"`
   );
 } else {
-  // Attempt to initialize Firebase only if all keys are present and API key is not a known placeholder
+  // Attempt to initialize Firebase only if all keys are present
   try {
     const firebaseAppInstance = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     app = firebaseAppInstance;

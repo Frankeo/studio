@@ -15,8 +15,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Clapperboard, Edit3, UserCircle, Loader2 } from 'lucide-react';
-import { getUserInitials } from '@/lib/utils'; // Import the helper function
+import { getUserInitials } from '@/lib/utils'; 
 import Link from 'next/link';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const profileSchema = z.object({
   displayName: z.string().max(50, { message: "Display name must be 50 characters or less." }).optional().or(z.literal('')),
@@ -26,7 +27,7 @@ const profileSchema = z.object({
 type ProfileFormInputs = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
-  const { user, loading: authLoading, updateUserProfile } = useAuth();
+  const { user, loading: authLoading, updateUserProfile, userProfileData, loadingProfile } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -64,10 +65,10 @@ export default function ProfilePage() {
     try {
       const updates: { displayName?: string | null; photoURL?: string | null } = {};
       if (data.displayName !== user.displayName) {
-        updates.displayName = data.displayName || null; // Send null to remove if empty
+        updates.displayName = data.displayName || null; 
       }
       if (data.photoURL !== user.photoURL) {
-        updates.photoURL = data.photoURL || null; // Send null to remove if empty
+        updates.photoURL = data.photoURL || null; 
       }
 
       if (Object.keys(updates).length > 0) {
@@ -91,7 +92,7 @@ export default function ProfilePage() {
 
   const currentPhotoURL = watch('photoURL');
 
-  if (authLoading || (!user && !authLoading)) {
+  if (authLoading || (!user && !authLoading) || (user && loadingProfile && !userProfileData) ) {
     return (
       <>
         <Header />
@@ -208,6 +209,16 @@ export default function ProfilePage() {
                 <div><strong className="text-muted-foreground">Provider:</strong> {user.providerData.length > 0 ? getProviderName(user.providerData[0].providerId) : 'N/A'}</div>
                 <div><strong className="text-muted-foreground">Account Created:</strong> {user.metadata.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'N/A'}</div>
                 <div><strong className="text-muted-foreground">Last Sign-in:</strong> {user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).toLocaleString() : 'N/A'}</div>
+                <div>
+                  <strong className="text-muted-foreground">Admin Status:</strong>{' '}
+                  {loadingProfile ? (
+                    <Skeleton className="h-4 w-10 inline-block" />
+                  ) : userProfileData ? (
+                    userProfileData.isAdmin ? 'Yes' : 'No'
+                  ) : (
+                    'N/A'
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>

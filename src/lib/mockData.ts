@@ -1,6 +1,7 @@
 
 import { type User } from 'firebase/auth';
 import type { Movie } from '@/types/movie';
+import type { UserProfile } from '@/types/userProfile';
 
 export const MOCK_VIDEO_URL = "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4";
 
@@ -55,6 +56,10 @@ export const mockUser: User = {
   }),
 };
 
+export const mockUserProfileData: UserProfile = {
+  uid: mockUser.uid,
+  isAdmin: true, // Mock admin user is an admin
+};
 
 export const mockMovies: Movie[] = [
   {

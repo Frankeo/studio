@@ -1,5 +1,6 @@
 
 import type { User } from "firebase/auth";
+import type { UserProfile } from "@/types/userProfile";
 
 export interface AuthContextType {
     user: User | null;
@@ -8,4 +9,6 @@ export interface AuthContextType {
     signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
     updateUserProfile: (updates: { displayName?: string | null; photoURL?: string | null }) => Promise<void>;
+    userProfileData: UserProfile | null;
+    loadingProfile: boolean;
   }

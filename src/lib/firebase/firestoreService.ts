@@ -1,10 +1,12 @@
 
 import { db, isFirebaseConfigured } from './config';
 import type { Movie } from '@/types/movie';
-import { mockMovies, MOCK_VIDEO_URL } from '../mockData';
+import type { UserProfile } from '@/types/userProfile';
+import { mockMovies, MOCK_VIDEO_URL, mockUserProfileData } from '../mockData';
 import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, type FieldPath } from 'firebase/firestore';
 
 const MOVIES_COLLECTION = 'movies';
+const USERS_COLLECTION = 'users';
 
 // Helper to convert Firestore doc to Movie type
 const mapDocToMovie = (docSnap: QueryDocumentSnapshot | DocumentSnapshot): Movie => {
@@ -14,7 +16,7 @@ const mapDocToMovie = (docSnap: QueryDocumentSnapshot | DocumentSnapshot): Movie
     title: data?.title || 'Untitled',
     description: data?.description || '',
     posterUrl: data?.posterUrl || `https://picsum.photos/seed/${docSnap.id}/300/450`,
-    videoUrl: data?.videoUrl || MOCK_VIDEO_URL, // Fallback to mock video URL if not present
+    videoUrl: data?.videoUrl || MOCK_VIDEO_URL, 
     genre: data?.genre || 'Unknown',
     duration: data?.duration || 'N/A',
     rating: data?.rating || 0,
@@ -39,15 +41,11 @@ export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot
       if (lastIndex !== -1) {
         startIndex = lastIndex + 1;
       } else {
-        // If lastMockId from lastDoc is not found in mockMovies,
-        // it implies an issue or end of list based on that ID.
-        // Return empty to prevent refetching page 1 or errors.
         console.warn(`Mock ID "${lastMockId}" from lastDoc not found in mockMovies. Returning empty list.`);
         return { movies: [], lastVisible: null };
       }
     }
 
-    // If startIndex is already at or beyond the length of mockMovies, no more movies.
     if (startIndex >= mockMovies.length) {
       return { movies: [], lastVisible: null };
     }
@@ -55,13 +53,11 @@ export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot
     const paginatedMockMovies = mockMovies.slice(startIndex, startIndex + pageSize);
     
     let newMockLastVisible: DocumentSnapshot | null = null;
-    // Check if there are more movies *after* the current batch    
     if (startIndex + paginatedMockMovies.length < mockMovies.length) {
-        // Create a mock DocumentSnapshot-like object for pagination
         const lastFetchedMovieInBatch = paginatedMockMovies[paginatedMockMovies.length - 1];
         newMockLastVisible = { 
-            id: `mock-last-visible-${lastFetchedMovieInBatch.id}`, // A somewhat unique ID for the mock snapshot
-            mockId: lastFetchedMovieInBatch.id, // This is the important part for mock pagination
+            id: `mock-last-visible-${lastFetchedMovieInBatch.id}`, 
+            mockId: lastFetchedMovieInBatch.id, 
             data: () => ({ ...mockMovies.find(m => m.id === lastFetchedMovieInBatch.id) }), 
             exists: () => true,
             get: (fieldPath: string | number | FieldPath) => {
@@ -73,13 +69,12 @@ export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot
                 return undefined;
             },
             ref: { path: `${MOVIES_COLLECTION}/mock-last-visible-${lastFetchedMovieInBatch.id}` },
-        } as unknown as DocumentSnapshot; // Cast to MockDocumentSnapshot first
+        } as unknown as DocumentSnapshot; 
     }
     
     return { movies: paginatedMockMovies, lastVisible: newMockLastVisible };
   }
 
-  // Firestore logic remains the same
   try {
     const moviesRef = collection(db, MOVIES_COLLECTION);
     let q;
@@ -105,7 +100,7 @@ export const getMovieById = async (id: string): Promise<Movie | null> => {
   if (!isFirebaseConfigured || !db) {
     console.warn(`Firebase not configured. Returning mock movie by ID: ${id}.`);
     const movie = mockMovies.find(m => m.id === id);
-    if (movie) return { ...movie, videoUrl: movie.videoUrl || MOCK_VIDEO_URL }; // Ensure MOCK_VIDEO_URL fallback
+    if (movie) return { ...movie, videoUrl: movie.videoUrl || MOCK_VIDEO_URL }; 
     return null;
   }
 
@@ -125,3 +120,33 @@ export const getMovieById = async (id: string): Promise<Movie | null> => {
   }
 };
 
+export const getUserProfileFromFirestore = async (userId: string): Promise<UserProfile | null> => {
+  if (!isFirebaseConfigured || !db) {
+    console.warn(`Firebase not configured. Returning mock user profile for UID: ${userId}.`);
+    if (userId === mockUserProfileData.uid) {
+      return mockUserProfileData;
+    }
+    return null;
+  }
+
+  try {
+    const userDocRef = doc(db, USERS_COLLECTION, userId);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (userDocSnap.exists()) {
+      const data = userDocSnap.data();
+      return {
+        uid: userId,
+        isAdmin: data?.isAdmin || false,
+        // Add other profile fields here if they exist in Firestore
+      };
+    } else {
+      console.log(`User profile document not found for UID: ${userId}. Defaulting isAdmin to false.`);
+      // If no profile doc, assume not admin. You might want to create one here if needed.
+      return { uid: userId, isAdmin: false };
+    }
+  } catch (error) {
+    console.error(`Error fetching user profile for UID ${userId}:`, error);
+    return null; // Or return a default profile object
+  }
+};

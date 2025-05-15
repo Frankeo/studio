@@ -34,6 +34,12 @@ jobs:
       - name: Generate Report Unit Test
         run: npm run coverage
 
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-html
+          path: coverage
+
       - name: Build Next.js application
         env:
           # These NEXT_PUBLIC_ variables are required for the 'next build' command

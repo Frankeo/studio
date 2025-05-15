@@ -5,7 +5,7 @@ export interface Movie {
   posterUrl: string;
   videoUrl: string;
   genre: string;
-  duration: string; 
-  rating: number; 
-  year: number;
+  duration: string;
+  rating: number; // Ensure this is number
+  year: number;   // Ensure this is number
 }

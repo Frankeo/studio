@@ -3,7 +3,7 @@ import { db, isFirebaseConfigured } from './config';
 import type { Movie } from '@/types/movie';
 import type { UserProfile } from '@/types/userProfile';
 import { mockMovies, MOCK_VIDEO_URL, mockUserProfileData } from '../mockData';
-import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, type FieldPath } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, type FieldPath, addDoc } from 'firebase/firestore';
 
 const MOVIES_COLLECTION = 'movies';
 const USERS_COLLECTION = 'users';
@@ -15,8 +15,8 @@ const mapDocToMovie = (docSnap: QueryDocumentSnapshot | DocumentSnapshot): Movie
     id: docSnap.id,
     title: data?.title || 'Untitled',
     description: data?.description || '',
-    posterUrl: data?.posterUrl || `https://picsum.photos/seed/${docSnap.id}/300/450`,
-    videoUrl: data?.videoUrl || MOCK_VIDEO_URL, 
+    posterUrl: data?.posterUrl || `https://placehold.co/300x450.png`, // Use placehold.co
+    videoUrl: data?.videoUrl || MOCK_VIDEO_URL,
     genre: data?.genre || 'Unknown',
     duration: data?.duration || 'N/A',
     rating: data?.rating || 0,
@@ -142,11 +142,32 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       };
     } else {
       console.log(`User profile document not found for UID: ${userId}. Defaulting isAdmin to false.`);
-      // If no profile doc, assume not admin. You might want to create one here if needed.
+      // If the document doesn't exist, create a default profile object.
+      // You might also choose to create the document in Firestore here if that's desired behavior.
       return { uid: userId, isAdmin: false };
     }
   } catch (error) {
     console.error(`Error fetching user profile for UID ${userId}:`, error);
-    return null; // Or return a default profile object
+    return { uid: userId, isAdmin: false }; // Return a default profile with isAdmin: false on error
   }
 };
+
+// Add a new movie to Firestore
+export const addMovieToFirestore = async (movieData: Omit<Movie, 'id'>): Promise<string> => {
+  if (!isFirebaseConfigured || !db) {
+    console.warn("Firebase not configured. Movie not added to actual database. Simulating success with mock ID.");
+    // In a real mock scenario, you might push to a local mockMovies array if needed for immediate feedback,
+    // but that won't persist. For now, just simulate success.
+    return `mock-new-movie-${Date.now()}`;
+  }
+
+  try {
+    const moviesRef = collection(db, MOVIES_COLLECTION);
+    const docRef = await addDoc(moviesRef, movieData);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error adding movie to Firestore: ", error);
+    throw error; // Re-throw the error to be caught by the calling function
+  }
+};
+

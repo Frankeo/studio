@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Clapperboard, LogOut, UserCircle, User as UserIcon } from 'lucide-react'; // Added UserIcon
+import { Clapperboard, LogOut, UserCircle, User as UserIcon, Film } from 'lucide-react'; // Added Film
 import { useAuth } from '@/context/AuthContext'; // Use AuthContext
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -16,10 +16,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from '@/hooks/use-toast';
-import { getUserInitials } from '@/lib/utils'; // Import the utility function
+import { getUserInitials } from '@/lib/utils'; 
 
 export default function Header() {
-  const { user, signOut } = useAuth(); // Get user and signOut from context
+  const { user, signOut, userProfileData } = useAuth(); // Get user, signOut, and userProfileData from context
   const router = useRouter();
   const { toast } = useToast();
 
@@ -71,6 +71,14 @@ export default function Header() {
                     <span>Profile</span>
                   </Link>
                 </DropdownMenuItem>
+                {userProfileData?.isAdmin && (
+                  <DropdownMenuItem asChild className="cursor-pointer">
+                    <Link href="/add-movie">
+                      <Film className="mr-2 h-4 w-4" />
+                      <span>Add Movie</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />

@@ -10,8 +10,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "coverage": "vitest run --coverage",
-    "prepare": "husky install"
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.8.0",

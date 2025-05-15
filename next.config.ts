@@ -16,6 +16,18 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cloudfront-eu-central-1.images.arcpublishing.com',
+        port: '',
+        pathname: '/**',
+      }
       // Add other image source hostnames if needed, e.g., Firebase Storage
       // {
       //   protocol: 'https',

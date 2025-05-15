@@ -4,7 +4,7 @@ name: Deploy to Firebase Hosting (Main)
 on:
   push:
     branches:
-      - master # Deploys on push to master branch
+      - dev # Deploys on push to master branch
 
 jobs:
   build_and_deploy:
@@ -40,6 +40,6 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}' # GITHUB_TOKEN is automatically available
-          firebaseToken: '${{ secrets.FIREBASE_CLI_TOKEN }}' # Requires FIREBASE_CLI_TOKEN secret
+          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           projectId: '${{ vars.FIREBASE_PROJECT_ID }}' # Requires FIREBASE_PROJECT_ID repository variable
           channelId: live # Deploy to the live channel

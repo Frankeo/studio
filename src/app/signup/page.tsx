@@ -48,7 +48,10 @@ export default function SignUpPage() {
     setIsLoading(true);
     try {
       await signUpWithEmailAndPassword(data.email, data.password, data.displayName || undefined, data.photoURL || undefined);
-      toast({ title: 'Sign Up Successful', description: 'Welcome! You are now logged in.' });
+      toast({ 
+        title: 'Sign Up Successful', 
+        description: 'Welcome! A verification email has been sent to your address. Please check your inbox.' 
+      });
       router.push('/catalog');
     } catch (error) {
       toast({

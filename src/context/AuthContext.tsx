@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       let newUser: User;
       if (isFirebaseConfigured && auth) {
-        const userCredential = await fbSignUpWithEmailAndPassword(email, pass);
+        const userCredential = await fbSignUpWithEmailAndPassword(email, pass); // This now handles sending verification email
         newUser = userCredential.user;
         if (displayName || photoURL) {
           await fbUpdateUserProfile(newUser, { displayName: displayName || null, photoURL: photoURL || null });

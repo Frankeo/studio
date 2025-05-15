@@ -6,6 +6,7 @@ import {
   GoogleAuthProvider, 
   signInWithPopup,
   updateProfile, 
+  sendEmailVerification, // Added
   type UserCredential,
   type User 
 } from 'firebase/auth';
@@ -44,7 +45,7 @@ export const fbSignUpWithEmailAndPassword = async (email: string, password: stri
       emailVerified: false, // New users typically aren't verified immediately
       providerData: [{
         providerId: 'password',
-        uid: `mock-user-${Date.now()}`,
+        uid: `mock-user-${Date.now()}`, // Ensure this UID is consistent if used elsewhere for this mock user
         displayName: null,
         email: email,
         phoneNumber: null,
@@ -57,7 +58,16 @@ export const fbSignUpWithEmailAndPassword = async (email: string, password: stri
       operationType: 'signIn', // createUserWithEmailAndPassword also signs the user in
     } as UserCredential);
   }
-  return createUserWithEmailAndPassword(auth, email, password);
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  // Send verification email
+  try {
+    await sendEmailVerification(userCredential.user);
+    console.log("Verification email sent to:", userCredential.user.email);
+  } catch (error) {
+    console.error("Error sending verification email:", error);
+    // Do not let this error block the sign-up flow, but log it.
+  }
+  return userCredential;
 };
 
 // Sign in with Google

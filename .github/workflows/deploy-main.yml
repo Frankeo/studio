@@ -44,7 +44,7 @@ jobs:
         run: firebase experiments:enable apphosting
 
       - name: Deploy to Firebase App Hosting
-        run: firebase deploy --only apphosting --project ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+        run: firebase deploy --only hosting --project ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
         env:
           # Use a service account for authentication
           FIREBASE_TOKEN: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"

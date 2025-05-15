@@ -1,5 +1,4 @@
-
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FeaturedMoviesSection from './FeaturedMoviesSection';
 import type { Movie } from '@/types/movie';
@@ -22,7 +21,7 @@ describe('FeaturedMoviesSection', () => {
 
   it('renders skeleton when isLoading is true', () => {
     render(<FeaturedMoviesSection movies={[]} isLoading={true} />);
-    expect(screen.getByText(/Title Skeleton/i)).toBeInTheDocument(); // Based on Skeleton aria-label or text
+    expect(screen.getByLabelText('Title Skeleton')).toBeInTheDocument(); // Based on Skeleton aria-label or text
     expect(screen.getAllByRole('generic').some(el => el.classList.contains('animate-pulse'))).toBe(true); // Check for skeleton presence
   });
 

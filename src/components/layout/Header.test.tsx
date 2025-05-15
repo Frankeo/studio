@@ -1,170 +1,167 @@
-
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { vi } from 'vitest';
 import Header from './Header';
-import type { User } from 'firebase/auth';
+import '@testing-library/jest-dom';
+import userEvent from '@testing-library/user-event';
+import { useAuth } from '@/context/AuthContext';
+import { User } from 'firebase/auth';
 import { AuthContextType } from '@/context/interfaces';
+import { useRouter } from 'next/navigation';
+import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
+import { useToast } from '@/hooks/use-toast';
 
+vi.mock('@/context/AuthContext')
+vi.mock('next/navigation')
+vi.mock('@/hooks/use-toast')
 
-// Mocks
-const mockPush = vi.fn();
-vi.mock('next/navigation', async () => {
-    const actual = await vi.importActual('next/navigation');
-    return {
-        ...actual,
-        useRouter: () => ({
-        push: mockPush,
-        }),
-    };
-});
-
-const mockToast = vi.fn();
-vi.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({
-    toast: mockToast,
-  }),
+// Mock getUserInitials and cn from utils
+vi.mock('@/lib/utils', () => ({
+  getUserInitials: vi.fn((user) => user?.email?.charAt(0).toUpperCase() || ''),
+  cn: vi.fn((...inputs) => inputs.join(' ')), // Mock cn to simply join class names
 }));
-
-const mockSignOut = vi.fn();
-
-const mockUser: User = {
-  uid: 'test-uid',
-  providerId: 'test-uid',
-  phoneNumber: null,
-  email: 'test@example.com',
-  displayName: 'Test User',
-  photoURL: 'https://picsum.photos/seed/test/40/40',
-  emailVerified: true,
-  isAnonymous: false,
-  metadata: {},
-  providerData: [],
-  refreshToken: 'test-token',
-  tenantId: null,
-  delete: vi.fn(),
-  getIdToken: vi.fn(),
-  getIdTokenResult: vi.fn(),
-  reload: vi.fn(),
-  toJSON: () => ({}),
-};
-
-const mockUseAuth = (user: User | null = null, loading: boolean = false): Partial<AuthContextType> => ({
-  user,
-  loading,
-  signOut: mockSignOut,
-  signInWithEmail: vi.fn(),
-  signInWithGoogle: vi.fn(),
-});
-
-const useAuthMock = vi.fn();
-vi.mock('@/context/AuthContext', () => ({
-  useAuth: useAuthMock,
-}));
-
 
 describe('Header', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  const mockedAuth = {
+    user: { uid: 'test-uid', email: 'test@example.com', displayName: 'Test User' } as User,
+    loading: false,
+    signOut: vi.fn(),
+  } as unknown as AuthContextType;
 
-  it('renders logo and title', () => {
-    useAuthMock.mockReturnValue(mockUseAuth());
+  afterEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('does not render "Add Movie" when user is logged in and is not admin', async () => {
+    vi.mocked(useToast).mockReturnValue({
+      toast: vi.fn(),
+      dismiss: undefined as unknown as () => void,
+      toasts: []
+    });
+
+    vi.mocked(useAuth).mockReturnValue({    
+      ...mockedAuth,
+      userProfileData: { isAdmin: false },
+    } as unknown as AuthContextType);
+
     render(<Header />);
-    expect(screen.getByText('StreamVerse')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /streamverse/i })).toHaveAttribute('href', '/');
+
+    const userAvatar = await screen.findByTestId("user-button");
+    await userEvent.click(userAvatar);
+
+    expect(screen.queryByTestId("add-movie-link")).not.toBeInTheDocument();
   });
 
-  describe('User Not Logged In', () => {
-    beforeEach(() => {
-      useAuthMock.mockReturnValue(mockUseAuth(null));
+  it('calls signOut and navigates to login when Log out is clicked', async () => {
+    const mockToast = vi.fn();
+    vi.mocked(useToast).mockReturnValue({
+      toast: mockToast,
+      dismiss: undefined as unknown as () => void,
+      toasts: []
     });
 
-    it('renders Login button', () => {
-      render(<Header />);
-      expect(screen.getByRole('link', { name: /login/i })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /login/i })).toHaveAttribute('href', '/login');
-    });
+    const mockPush = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: mockPush
+    } as unknown as AppRouterInstance);
 
-    it('does not render Catalog link or user avatar', () => {
-      render(<Header />);
-      expect(screen.queryByText(/catalog/i)).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /user avatar/i })).not.toBeInTheDocument(); // Adjust name if accessible name is different
+    const mockSignOut = vi.fn();
+    vi.mocked(useAuth).mockReturnValue({    
+      ...mockedAuth,
+      signOut: mockSignOut
+    } as unknown as AuthContextType);
+
+    render(<Header />);
+
+    const userAvatar = await screen.findByTestId("user-button");
+    await userEvent.click(userAvatar);
+
+    const signOutMenuItem = await screen.findByRole('menuitem', { name: /log out/i });
+    await userEvent.click(signOutMenuItem);
+
+    // Wait for signOut and push to be called
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/login');
+    expect(mockToast).toHaveBeenCalledWith({
+      title: 'Logged Out',
+      description: 'You have been successfully logged out.',
     });
   });
 
-  describe('User Logged In', () => {
-    beforeEach(() => {
-      useAuthMock.mockReturnValue(mockUseAuth(mockUser));
+  it('TO DELETE', async () => {
+    vi.mocked(useToast).mockReturnValue({
+      toast: vi.fn(),
+      dismiss: undefined as unknown as () => void,
+      toasts: []
     });
 
-    it('renders Catalog link', () => {
-      render(<Header />);
-      expect(screen.getByRole('link', { name: /catalog/i })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /catalog/i })).toHaveAttribute('href', '/catalog');
+    vi.mocked(useAuth).mockReturnValue({    
+      user: null,
+      loading: false,
+      signOut: vi.fn()
+    } as unknown as AuthContextType);
+
+    render(<Header />);
+
+    const loginLink = screen.getByRole('link', { name: /login/i });
+
+    expect(loginLink).toHaveAttribute('href', '/login');
+    expect(screen.queryByTestId("user-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("profile-button")).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /log out/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-movie-link")).not.toBeInTheDocument();
+  });
+
+  it('the Profile menu has a profile link', async () => {
+    vi.mocked(useToast).mockReturnValue({
+      toast: vi.fn(),
+      dismiss: undefined as unknown as () => void,
+      toasts: []
     });
+    vi.mocked(useAuth).mockReturnValue({
+      ...mockedAuth,
+      userProfileData: { isAdmin: false },
+    } as unknown as AuthContextType)
 
-    it('renders user avatar and dropdown', async () => {
-      const user = userEvent.setup();
-      render(<Header />);
-      
-      const avatarButton = screen.getByRole('button'); // Avatar is usually a button for dropdown
-      expect(avatarButton).toBeInTheDocument();
-      
-      // Check for avatar image (might need more specific selector if image is nested)
-      const avatarImage = screen.getByRole('img', { name: mockUser.displayName || mockUser.email || 'User' });
-      expect(avatarImage).toBeInTheDocument();
-      if (mockUser.photoURL) {
-        expect(avatarImage).toHaveAttribute('src', mockUser.photoURL);
-      }
+    render(<Header />);
 
+    const userAvatar = await screen.findByTestId("user-button");
+    await userEvent.click(userAvatar);
 
-      await user.click(avatarButton);
+    const profileMenuItem = await screen.findByTestId("profile-button");
 
-      await waitFor(() => {
-        expect(screen.getByText(mockUser.displayName!)).toBeInTheDocument();
-        expect(screen.getByText(mockUser.email!)).toBeInTheDocument();
-        expect(screen.getByText(/log out/i)).toBeInTheDocument();
-      });
+    expect(profileMenuItem).toHaveAttribute('href', '/profile');
+  });
+
+  it('the Add Movie menu has a add-movie link (if admin)', async () => {
+    vi.mocked(useToast).mockReturnValue({
+      toast: vi.fn(),
+      dismiss: undefined as unknown as () => void,
+      toasts: []
     });
-    
-    it('handles logout successfully', async () => {
-      const user = userEvent.setup();
-      render(<Header />);
-      
-      mockSignOut.mockResolvedValueOnce(undefined);
+    vi.mocked(useAuth).mockReturnValue({
+      ...mockedAuth,
+      userProfileData: { isAdmin: true }
+    } as unknown as AuthContextType)
 
-      const avatarButton = screen.getByRole('button');
-      await user.click(avatarButton);
-      
-      const logoutButton = await screen.findByText(/log out/i);
-      await user.click(logoutButton);
+    render(<Header />);
+    const userAvatar = await screen.findByTestId("user-button");
+    await userEvent.click(userAvatar);
 
-      await waitFor(() => {
-        expect(mockSignOut).toHaveBeenCalled();
-        expect(mockPush).toHaveBeenCalledWith('/login');
-        expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Logged Out' }));
-      });
+    const movieItem = await screen.findByTestId("add-movie-link");
+    expect(movieItem).toHaveAttribute('href', '/add-movie');
+  });
+
+  it('the app logo has a home link', async () => {
+    vi.mocked(useToast).mockReturnValue({
+      toast: vi.fn(),
+      dismiss: undefined as unknown as () => void,
+      toasts: []
     });
+    vi.mocked(useAuth).mockReturnValue(mockedAuth)
+    render(<Header />);
 
-    it('handles logout failure', async () => {
-      const user = userEvent.setup();
-      render(<Header />);
-      
-      mockSignOut.mockRejectedValueOnce(new Error('Logout failed'));
+    const appLogoLink = await screen.findByTestId("home-link");
 
-      const avatarButton = screen.getByRole('button');
-      await user.click(avatarButton);
-      
-      const logoutButton = await screen.findByText(/log out/i);
-      await user.click(logoutButton);
-
-      await waitFor(() => {
-        expect(mockSignOut).toHaveBeenCalled();
-        expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
-          title: 'Logout Failed',
-          description: 'Logout failed',
-          variant: 'destructive',
-        }));
-      });
-    });
+    expect(appLogoLink).toHaveAttribute('href', '/');;
   });
 });

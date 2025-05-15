@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { Clapperboard, LogOut, UserCircle, User as UserIcon, Film } from 'lucide-react'; // Added Film
-import { useAuth } from '@/context/AuthContext'; // Use AuthContext
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,13 +19,15 @@ import { useToast } from '@/hooks/use-toast';
 import { getUserInitials } from '@/lib/utils'; 
 
 export default function Header() {
-  const { user, signOut, userProfileData } = useAuth(); // Get user, signOut, and userProfileData from context
+  const { user, signOut, userProfileData } = useAuth();
+  
   const router = useRouter();
   const { toast } = useToast();
 
   const handleLogout = async () => {
     try {
       await signOut();
+
       router.push('/login');
       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
     } catch (error) {
@@ -40,7 +42,7 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center space-x-2 text-primary hover:opacity-80 transition-opacity">
+        <Link href="/" data-testid="home-link" className="flex items-center space-x-2 text-primary hover:opacity-80 transition-opacity">
           <Clapperboard className="h-8 w-8" />
           <span className="text-2xl font-bold">StreamVerse</span>
         </Link>
@@ -48,7 +50,7 @@ export default function Header() {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                <Button data-testid="user-button" variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || 'User'} />
                     <AvatarFallback className="text-xl capitalize">
@@ -66,14 +68,14 @@ export default function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild className="cursor-pointer">
-                  <Link href="/profile">
+                  <Link href="/profile" data-testid="profile-button">
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </Link>
                 </DropdownMenuItem>
                 {userProfileData?.isAdmin === true && (
                   <DropdownMenuItem asChild className="cursor-pointer">
-                    <Link href="/add-movie">
+                    <Link href="/add-movie" data-testid="add-movie-link">
                       <Film className="mr-2 h-4 w-4" />
                       <span>Add Movie</span>
                     </Link>

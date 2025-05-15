@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act, within } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FeaturedMoviesSection from './FeaturedMoviesSection';
 import type { Movie } from '@/types/movie';

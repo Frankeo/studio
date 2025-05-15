@@ -1,10 +1,8 @@
 
-import { db, isFirebaseConfigured } from './config';
+import { db } from './config';
 import type { Movie } from '@/types/movie';
-
-import { mockMovies, MOCK_VIDEO_URL, mockUserProfileData } from '../mockData';
-import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, type FieldPath, addDoc } from 'firebase/firestore';
-import { UserProfile } from 'firebase/auth';
+import { collection, getDocs, doc, getDoc, query, limit, startAfter, type DocumentSnapshot, type QueryDocumentSnapshot, type FieldPath, addDoc, setDoc } from 'firebase/firestore'; // Added setDoc
+import type { UserProfile } from 'firebase/auth'; // Changed from 'firebase/auth' to actual UserProfile path if different
 
 const MOVIES_COLLECTION = 'movies';
 const USERS_COLLECTION = 'users';
@@ -16,8 +14,8 @@ const mapDocToMovie = (docSnap: QueryDocumentSnapshot | DocumentSnapshot): Movie
     id: docSnap.id,
     title: data?.title || 'Untitled',
     description: data?.description || '',
-    posterUrl: data?.posterUrl || `https://placehold.co/300x450.png`, // Use placehold.co
-    videoUrl: data?.videoUrl || MOCK_VIDEO_URL,
+    posterUrl: data?.posterUrl || `https://placehold.co/300x450.png`,
+    videoUrl: data?.videoUrl || '', // Default to empty string if no mock
     genre: data?.genre || 'Unknown',
     duration: data?.duration || 'N/A',
     rating: data?.rating || 0,
@@ -31,49 +29,9 @@ interface PaginatedMoviesResult {
 }
 
 export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot | null = null): Promise<PaginatedMoviesResult> => {
-  if (!isFirebaseConfigured || !db) {
-    console.warn("Firebase not configured. Returning mock movies.");
-
-    let startIndex = 0;
-    if (lastDoc && 'mockId' in lastDoc && typeof lastDoc.mockId === 'string') {
-      const lastMockId = lastDoc.mockId;
-      const lastIndex = mockMovies.findIndex(m => m.id === lastMockId);      
-      
-      if (lastIndex !== -1) {
-        startIndex = lastIndex + 1;
-      } else {
-        console.warn(`Mock ID "${lastMockId}" from lastDoc not found in mockMovies. Returning empty list.`);
-        return { movies: [], lastVisible: null };
-      }
-    }
-
-    if (startIndex >= mockMovies.length) {
-      return { movies: [], lastVisible: null };
-    }
-    
-    const paginatedMockMovies = mockMovies.slice(startIndex, startIndex + pageSize);
-    
-    let newMockLastVisible: DocumentSnapshot | null = null;
-    if (startIndex + paginatedMockMovies.length < mockMovies.length) {
-        const lastFetchedMovieInBatch = paginatedMockMovies[paginatedMockMovies.length - 1];
-        newMockLastVisible = { 
-            id: `mock-last-visible-${lastFetchedMovieInBatch.id}`, 
-            mockId: lastFetchedMovieInBatch.id, 
-            data: () => ({ ...mockMovies.find(m => m.id === lastFetchedMovieInBatch.id) }), 
-            exists: () => true,
-            get: (fieldPath: string | number | FieldPath) => {
-                const itemData = mockMovies.find(m => m.id === lastFetchedMovieInBatch.id);
-                if (itemData && typeof fieldPath === 'string') {
-                  const prop = fieldPath as keyof typeof itemData;
-                  return itemData[prop];
-                }
-                return undefined;
-            },
-            ref: { path: `${MOVIES_COLLECTION}/mock-last-visible-${lastFetchedMovieInBatch.id}` },
-        } as unknown as DocumentSnapshot; 
-    }
-    
-    return { movies: paginatedMockMovies, lastVisible: newMockLastVisible };
+  if (!db) {
+    console.warn("Firestore (db) is not initialized. Returning empty movie list.");
+    return { movies: [], lastVisible: null };
   }
 
   try {
@@ -93,15 +51,13 @@ export const getMovies = async (pageSize: number = 12, lastDoc: DocumentSnapshot
     return { movies, lastVisible: newLastVisible };
   } catch (error) {
     console.error("Error fetching movies: ", error);
-    return { movies: [], lastVisible: null };
+    return { movies: [], lastVisible: null }; // Return empty on error
   }
 };
 
 export const getMovieById = async (id: string): Promise<Movie | null> => {
-  if (!isFirebaseConfigured || !db) {
-    console.warn(`Firebase not configured. Returning mock movie by ID: ${id}.`);
-    const movie = mockMovies.find(m => m.id === id);
-    if (movie) return { ...movie, videoUrl: movie.videoUrl || MOCK_VIDEO_URL }; 
+  if (!db) {
+    console.warn(`Firestore (db) is not initialized. Cannot fetch movie by ID: ${id}.`);
     return null;
   }
 
@@ -112,22 +68,19 @@ export const getMovieById = async (id: string): Promise<Movie | null> => {
     if (docSnap.exists()) {
       return mapDocToMovie(docSnap);
     } else {
-      console.log("No such document!");
+      console.log(`Movie document not found for ID: ${id}.`);
       return null;
     }
   } catch (error) {
-    console.error("Error fetching movie by ID: ", error);
+    console.error(`Error fetching movie by ID ${id}: `, error);
     return null;
   }
 };
 
 export const getUserProfileFromFirestore = async (userId: string): Promise<UserProfile | null> => {
-  if (!isFirebaseConfigured || !db) {
-    console.warn(`Firebase not configured. Returning mock user profile for UID: ${userId}.`);
-    if (userId === mockUserProfileData.uid) {
-      return mockUserProfileData;
-    }
-    return null;
+  if (!db) {
+    console.warn(`Firestore (db) is not initialized. Cannot fetch user profile for UID: ${userId}.`);
+    return null; // Return null if db is not available
   }
 
   try {
@@ -137,29 +90,31 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
     if (userDocSnap.exists()) {
       const data = userDocSnap.data();
       return {
-        uid: userId,
+        uid: userId, // This is from Firebase Auth, not Firestore doc typically
+        // photoURL and displayName are typically from Firebase Auth user object
+        // We are primarily interested in custom fields like isAdmin from Firestore
         isAdmin: data?.isAdmin || false,
         // Add other profile fields here if they exist in Firestore
-      };
+      } as UserProfile; // Cast as UserProfile if the shape matches
     } else {
-      console.log(`User profile document not found for UID: ${userId}. Defaulting isAdmin to false.`);
-      // If the document doesn't exist, create a default profile object.
-      // You might also choose to create the document in Firestore here if that's desired behavior.
-      return { uid: userId, isAdmin: false };
+      console.log(`User profile document not found for UID: ${userId}. Creating default profile.`);
+      // If the document doesn't exist, create a default one with isAdmin: false.
+      const defaultProfile = { uid: userId, isAdmin: false };
+      await setDoc(userDocRef, { isAdmin: false }); // Create the document in Firestore
+      return defaultProfile as UserProfile;
     }
   } catch (error) {
     console.error(`Error fetching user profile for UID ${userId}:`, error);
-    return { uid: userId, isAdmin: false }; // Return a default profile with isAdmin: false on error
+    // On error, you might return a default non-admin profile or null
+    // Returning null or a default non-admin profile is safer.
+    return { uid: userId, isAdmin: false } as UserProfile; 
   }
 };
 
 // Add a new movie to Firestore
 export const addMovieToFirestore = async (movieData: Omit<Movie, 'id'>): Promise<string> => {
-  if (!isFirebaseConfigured || !db) {
-    console.warn("Firebase not configured. Movie not added to actual database. Simulating success with mock ID.");
-    // In a real mock scenario, you might push to a local mockMovies array if needed for immediate feedback,
-    // but that won't persist. For now, just simulate success.
-    return `mock-new-movie-${Date.now()}`;
+  if (!db) {
+    throw new Error("Firestore (db) is not initialized. Cannot add movie.");
   }
 
   try {
@@ -168,7 +123,6 @@ export const addMovieToFirestore = async (movieData: Omit<Movie, 'id'>): Promise
     return docRef.id;
   } catch (error) {
     console.error("Error adding movie to Firestore: ", error);
-    throw error; // Re-throw the error to be caught by the calling function
+    throw error; 
   }
 };
-

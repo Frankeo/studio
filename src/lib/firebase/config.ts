@@ -14,7 +14,7 @@ const firebaseConfig = {
 };
 
 // Define known placeholder values for the API key
-const PLACEHOLDER_API_KEYS = ["YOUR_API_KEY", "YOUR_FIREBASE_API_KEY"];
+const PLACEHOLDER_API_KEYS = ["YOUR_API_KEY", "YOUR_FIREBASE_API_KEY", ""];
 
 // Validate environment variables
 const requiredConfigKeys: (keyof typeof firebaseConfig)[] = [
@@ -33,13 +33,18 @@ let storage: FirebaseStorage | null = null;
 export let isFirebaseConfigured: boolean;
 
 const missingKeys = requiredConfigKeys.filter(key => !firebaseConfig[key]);
-const apiKeyIsPlaceholder = firebaseConfig.apiKey && (PLACEHOLDER_API_KEYS.includes(firebaseConfig.apiKey) || firebaseConfig.apiKey.trim() === "");
+const apiKeyIsInvalid = firebaseConfig.apiKey && (PLACEHOLDER_API_KEYS.includes(firebaseConfig.apiKey) || firebaseConfig.apiKey.trim() === "" || firebaseConfig.apiKey === "null" || firebaseConfig.apiKey === "undefined");
 
-if (missingKeys.length > 0) {
+
+if (missingKeys.length > 0 || apiKeyIsInvalid) {
   isFirebaseConfigured = false;
+  const reason = missingKeys.length > 0
+    ? `Firebase configuration is missing or empty for the following keys: ${missingKeys.join(', ')}.`
+    : `Firebase API key (NEXT_PUBLIC_FIREBASE_API_KEY) is set to a placeholder or invalid value ("${firebaseConfig.apiKey}").`;
+  
   console.warn(
-    `Firebase configuration is missing or empty for the following keys: ${missingKeys.join(', ')}. 
-Falling back to mock data and auth where applicable.
+    `${reason} 
+Firebase services will not be initialized. The application may not function as expected.
 Please ensure all NEXT_PUBLIC_FIREBASE_ prefixed variables are set correctly in your .env.local file and that the Next.js development server was restarted after changes.
 Example .env.local:
 NEXT_PUBLIC_FIREBASE_API_KEY="YOUR_API_KEY"
@@ -49,26 +54,18 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="YOUR_STORAGE_BUCKET"
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="YOUR_MESSAGING_SENDER_ID"
 NEXT_PUBLIC_FIREBASE_APP_ID="YOUR_APP_ID"`
   );
-} else if (apiKeyIsPlaceholder) {
-  isFirebaseConfigured = false;
-  console.warn(
-    `Firebase API key (NEXT_PUBLIC_FIREBASE_API_KEY) is set to a placeholder value ("${firebaseConfig.apiKey}") or is empty. 
-Falling back to mock data and auth. 
-If you intend to use Firebase, please ensure it is set to a valid key in your .env.local file and that the Next.js development server was restarted after changes.`
-  );
 } else {
-  isFirebaseConfigured = true;
-  // Initialize Firebase only if all keys are present and API key is not a placeholder
+  // Attempt to initialize Firebase only if all keys are present and API key is not a known placeholder
   try {
     const firebaseAppInstance = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     app = firebaseAppInstance;
     auth = getAuth(firebaseAppInstance);
     db = getFirestore(firebaseAppInstance);
     storage = getStorage(firebaseAppInstance);
+    isFirebaseConfigured = true; // Set to true only if initialization succeeds
+    console.log("Firebase configured and initialized successfully.");
   } catch (error) {
-    // This catch block is a fallback, though the primary check is `missingKeys` or placeholder.
-    // It could catch other Firebase initialization errors if config is valid but something else goes wrong.
-    console.error("Firebase initialization failed despite valid-looking configuration:", error);
+    console.error("Firebase initialization failed:", error);
     isFirebaseConfigured = false; // Explicitly set to false on error
     app = null;
     auth = null;

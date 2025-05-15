@@ -1,7 +1,6 @@
 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage, isFirebaseConfigured } from './config';
-import { MOCK_VIDEO_URL } from '../mockData';
+import { storage } from './config';
 
 /**
  * Uploads a video file to Firebase Storage.
@@ -10,18 +9,14 @@ import { MOCK_VIDEO_URL } from '../mockData';
  * @returns A promise that resolves with the download URL of the uploaded file.
  */
 export const uploadVideoToFirebaseStorage = async (file: File, path: string): Promise<string> => {
-  if (!isFirebaseConfigured || !storage) {
-    console.warn("Firebase Storage not configured. Returning mock video URL.");
-    // Simulate a short delay for mock upload
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return MOCK_VIDEO_URL;
+  if (!storage) {
+    throw new Error("Firebase Storage is not initialized. Cannot upload video.");
   }
 
   if (!file) {
     throw new Error("No file provided for upload.");
   }
 
-  // Create a unique filename, e.g., videos/1678886400000-myvideo.mp4
   const fileName = `${Date.now()}-${file.name}`;
   const storageRef = ref(storage, `${path}/${fileName}`);
 
@@ -45,10 +40,8 @@ export const uploadVideoToFirebaseStorage = async (file: File, path: string): Pr
  * @returns A promise that resolves with the download URL of the uploaded file.
  */
 export const uploadImageToFirebaseStorage = async (file: File, path: string): Promise<string> => {
-  if (!isFirebaseConfigured || !storage) {
-    console.warn("Firebase Storage not configured. Returning mock image URL.");
-    await new Promise(resolve => setTimeout(resolve, 500)); // Shorter delay for images
-    return `https://placehold.co/300x450.png`; // Default placeholder
+  if (!storage) {
+    throw new Error("Firebase Storage is not initialized. Cannot upload image.");
   }
 
   if (!file) {

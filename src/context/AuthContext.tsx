@@ -10,8 +10,7 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut 
 } from 'firebase/auth';
-import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
-import { mockUser, MOCK_USER_CREDENTIALS, mockUserProfileData } from '@/lib/mockData';
+import { auth, db } from '@/lib/firebase/config';
 import { fbUpdateUserProfile, fbSignUpWithEmailAndPassword } from '@/lib/firebase/authService'; 
 import { getUserProfileFromFirestore } from '@/lib/firebase/firestoreService';
 import GlobalLoader from '@/components/layout/GlobalLoader';
@@ -21,11 +20,11 @@ import type { AuthContextType } from './interfaces';
 const AuthContext = createContext<AuthContextType>({ 
   user: null, 
   loading: true,
-  signInWithEmail: async () => {},
-  signInWithGoogle: async () => {},
-  signOut: async () => {},
-  updateUserProfile: async () => {},
-  signUpWithEmailAndPassword: async () => {},
+  signInWithEmail: async () => { throw new Error("Auth context not fully initialized."); },
+  signInWithGoogle: async () => { throw new Error("Auth context not fully initialized."); },
+  signOut: async () => { throw new Error("Auth context not fully initialized."); },
+  updateUserProfile: async () => { throw new Error("Auth context not fully initialized."); },
+  signUpWithEmailAndPassword: async () => { throw new Error("Auth context not fully initialized."); },
   userProfileData: null,
   loadingProfile: true,
 });
@@ -38,19 +37,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserProfile = useCallback(async (uid: string) => {
     setLoadingProfile(true);
+    if (!db) {
+      console.warn("Firestore (db) is not initialized. Cannot fetch user profile.");
+      setUserProfileData(null);
+      setLoadingProfile(false);
+      return;
+    }
     try {
-      if (isFirebaseConfigured && db) {
-        const profile = await getUserProfileFromFirestore(uid);
-        setUserProfileData(profile);
-      } else {
-        // Mock mode
-        if (uid === mockUser.uid) {
-          setUserProfileData(mockUserProfileData);
-        } else {
-           // For new mock users from sign-up, assume they are not admin by default
-          setUserProfileData({ uid, isAdmin: false });
-        }
-      }
+      const profile = await getUserProfileFromFirestore(uid);
+      setUserProfileData(profile);
     } catch (error) {
       console.error("Failed to fetch user profile:", error);
       setUserProfileData(null);
@@ -60,12 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (isFirebaseConfigured && auth) {
+    if (auth) {
       const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
         setUser(currentUser);
         if (currentUser) {
-          // Email verification is not strictly checked here for setting the user object,
-          // but rather on page access or during specific login flows.
           await fetchUserProfile(currentUser.uid);
         } else {
           setUserProfileData(null);
@@ -75,37 +68,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return () => unsubscribe();
     } else {
-      // Firebase not configured. User is initially logged out.
-      setUser(null); 
+      // Firebase Auth is not initialized (likely bad config or not configured)
+      setUser(null);
       setUserProfileData(null);
+      setLoading(false);
       setLoadingProfile(false);
-      setLoading(false); 
     }
   }, [fetchUserProfile]);
 
   const localSignInWithEmail = async (email: string, pass: string) => {
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized. Cannot sign in.');
+    }
     setLoading(true);
     setLoadingProfile(true);
     try {
-      if (isFirebaseConfigured && auth) {
-        const userCredential = await firebaseSignInWithEmailAndPassword(auth, email, pass);
-        if (userCredential.user && !userCredential.user.emailVerified) {
-          await firebaseSignOut(auth); // Sign out the unverified user from Firebase
-          throw new Error('Email not verified. Please check your email inbox for the verification link.');
-        }
-        // onAuthStateChanged will update user, fetch profile, and setLoading(false) for verified users
-      } else {
-        // Mock authentication
-        if (email === MOCK_USER_CREDENTIALS.email && pass === MOCK_USER_CREDENTIALS.password) {
-          // In mock mode, assume email is always verified for the mock admin
-          setUser(mockUser);
-          await fetchUserProfile(mockUser.uid); 
-        } else {
-          throw new Error('Invalid mock credentials');
-        }
-        setLoadingProfile(false); 
-        setLoading(false); 
+      const userCredential = await firebaseSignInWithEmailAndPassword(auth, email, pass);
+      if (userCredential.user && !userCredential.user.emailVerified) {
+        await firebaseSignOut(auth); 
+        throw new Error('Email not verified. Please check your email inbox for the verification link.');
       }
+      // onAuthStateChanged will update user, fetch profile, and manage loading states
     } catch (error) {
       setUser(null); 
       setUserProfileData(null);
@@ -116,19 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const localSignInWithGoogle = async () => {
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized. Cannot sign in with Google.');
+    }
     setLoading(true);
     setLoadingProfile(true);
     try {
-      if (isFirebaseConfigured && auth) {
-        const provider = new GoogleAuthProvider();
-        // Google sign-in usually implies email verification is handled by Google
-        await firebaseSignInWithPopup(auth, provider);
-        // onAuthStateChanged will handle the rest
-      } else {
-        setLoadingProfile(false);
-        setLoading(false);
-        throw new Error('Google Sign-In is not available when Firebase is not configured.');
-      }
+      const provider = new GoogleAuthProvider();
+      await firebaseSignInWithPopup(auth, provider);
+      // onAuthStateChanged will handle the rest
     } catch (error) {
       setUser(null); 
       setUserProfileData(null);
@@ -139,40 +118,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   
   const localSignUpWithEmailAndPassword = async (email: string, pass: string, displayName?: string, photoURL?: string) => {
+     if (!auth) {
+      throw new Error('Firebase Auth is not initialized. Cannot sign up.');
+    }
     setLoading(true);
     setLoadingProfile(true);
     try {
-      let newUser;
-      if (isFirebaseConfigured && auth) {
-        const userCredential = await fbSignUpWithEmailAndPassword(email, pass); 
-        newUser = userCredential.user;
-        if (displayName || photoURL) {
-          await fbUpdateUserProfile(newUser, { displayName: displayName || null, photoURL: photoURL || null });
-        }
-        // User will be set by onAuthStateChanged, but they will be unverified initially.
-        // The sign-up page will redirect to login with appropriate message.
-        // No need to manually set user here; let onAuthStateChanged handle it.
-        setLoading(false); // setLoading false once operation done.
-        setLoadingProfile(false); // Profile won't be fetched until verified login
-      } else {
-        // Mock sign-up
-        const userCredential = await fbSignUpWithEmailAndPassword(email, pass); 
-        newUser = {...userCredential.user};
-        if (displayName || photoURL) {
-          await fbUpdateUserProfile(newUser, { displayName: displayName || null, photoURL: photoURL || null });
-          if (displayName) newUser.displayName = displayName;
-          if (photoURL) newUser.photoURL = photoURL;
-        }
-        // For mock, we can set user directly and assume verified for simplicity of testing other flows
-        // or set emailVerified to false if we want to test the verification flow in mock
-        // For now, let's keep it simple: mock sign-up leads to a usable "verified" mock user
-        // But for the requested feature, new mock users should be unverified.
-        newUser.emailVerified = false; // Explicitly set to false for mock sign-up
-        setUser(newUser); 
-        await fetchUserProfile(newUser.uid); 
-        setLoadingProfile(false);
-        setLoading(false);
+      const userCredential = await fbSignUpWithEmailAndPassword(email, pass); 
+      const newUser = userCredential.user;
+      if (displayName || photoURL) {
+        await fbUpdateUserProfile(newUser, { displayName: displayName || null, photoURL: photoURL || null });
       }
+      // User will be set by onAuthStateChanged, but they will be unverified initially.
+      setLoading(false); 
+      setLoadingProfile(false); 
     } catch (error) {
       setUser(null);
       setUserProfileData(null);
@@ -183,57 +142,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const localSignOut = async () => {
-    setLoading(true);
+    if (!auth) {
+      // If auth is not even initialized, simply clear local state.
+      setUser(null);
+      setUserProfileData(null);
+      setLoading(false);
+      setLoadingProfile(false);
+      return;
+    }
+    setLoading(true); // These might be set to false quickly by onAuthStateChanged
     setLoadingProfile(true);
     try {
-      if (isFirebaseConfigured && auth) {
-        await firebaseSignOut(auth);
-        // onAuthStateChanged will set user to null
-      } else {
-        setUser(null);
-        setUserProfileData(null);
-        setLoadingProfile(false);
-        setLoading(false);
-      }
+      await firebaseSignOut(auth);
+      // onAuthStateChanged will set user to null and trigger profile state updates
     } catch (error) {
-      setLoadingProfile(false);
+      // Even if signout fails, reset local state as a fallback
+      setUser(null);
+      setUserProfileData(null);
       setLoading(false);
-      if (!isFirebaseConfigured) { 
-          setUser(null);
-          setUserProfileData(null);
-      }
+      setLoadingProfile(false);
       throw error;
     }
   };
 
   const localUpdateUserProfile = async (updates: { displayName?: string | null; photoURL?: string | null }) => {
-    if (!user) {
-      throw new Error("No user is signed in to update.");
+    if (!auth || !auth.currentUser) { // also check auth.currentUser
+      throw new Error("No user is signed in or Firebase Auth not initialized.");
     }
     setLoadingProfile(true); 
     try {
-      if (isFirebaseConfigured && auth && auth.currentUser) {
-        await fbUpdateUserProfile(auth.currentUser, updates);
-         setUser(prevUser => prevUser ? { ...prevUser, ...updates } : null);
-
-      } else if (!isFirebaseConfigured && user.uid === mockUser.uid) {
-        await fbUpdateUserProfile(mockUser, updates); 
-        setUser({ ...mockUser }); 
-      } else if (!isFirebaseConfigured && user) {
-        const updatedUser = {...user};
-        if(updates.displayName !== undefined) updatedUser.displayName = updates.displayName;
-        if(updates.photoURL !== undefined) updatedUser.photoURL = updates.photoURL;
-        setUser(updatedUser);
-      }
-       else {
-        throw new Error("Profile update is not available.");
-      }
+      await fbUpdateUserProfile(auth.currentUser, updates);
+      // Optimistically update local user state while onAuthStateChanged might also update it
+      setUser(prevUser => prevUser ? { ...prevUser, 
+        displayName: updates.displayName !== undefined ? updates.displayName : prevUser.displayName,
+        photoURL: updates.photoURL !== undefined ? updates.photoURL : prevUser.photoURL,
+      } : null);
     } finally {
+      // Fetch profile again to ensure consistency, though onAuthStateChanged might handle some of this
+      if (auth.currentUser) {
+        await fetchUserProfile(auth.currentUser.uid);
+      }
       setLoadingProfile(false);
     }
   };
 
-  if (loading && !user && isFirebaseConfigured) { // Only show global loader if Firebase is configured and initial check is pending
+  if (loading && !user) { 
     return <GlobalLoader />;
   }
 

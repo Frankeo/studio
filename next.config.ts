@@ -34,14 +34,14 @@ const nextConfig: NextConfig = {
         hostname: 'i.redd.it', // Added this line
         port: '',
         pathname: '/**',
-      }
+      },
       // Add other image source hostnames if needed, e.g., Firebase Storage
-      // {
-      //   protocol: 'https',
-      //   hostname: 'firebasestorage.googleapis.com',
-      //   port: '',
-      //   pathname: '/**',
-      // },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 };
